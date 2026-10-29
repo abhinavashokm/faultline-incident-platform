@@ -2,7 +2,13 @@ pyproject.toml
 app/__init__.py
 app/api_main.py
 app/auth/__init__.py
+app/auth/dependencies.py
 app/auth/models.py
+app/auth/repository.py
+app/auth/router.py
+app/auth/schemas.py
+app/auth/security.py
+app/auth/service.py
 app/core/__init__.py
 app/core/config.py
 app/core/db.py
@@ -15,4 +21,6 @@ faultline_control_plane.egg-info/SOURCES.txt
 faultline_control_plane.egg-info/dependency_links.txt
 faultline_control_plane.egg-info/requires.txt
 faultline_control_plane.egg-info/top_level.txt
+tests/test_auth_api.py
 tests/test_health.py
+tests/test_security.py

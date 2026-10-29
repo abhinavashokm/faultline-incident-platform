@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.core.db import engine, get_session
 
@@ -20,6 +21,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Faultline Control Plane", version="0.1.0", lifespan=lifespan)
+
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 
 
 @app.get("/healthz")
@@ -40,4 +43,3 @@ async def readyz(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
         )
-
