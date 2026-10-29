@@ -26,3 +26,9 @@ The schema is the source of truth. Never change it without asking.
 - Do not add dependencies, features or files outside the task. Do not touch other services.
 - Never run docker, alembic or database commands. Tell me which commands to run.
 - Finish with a list of the files you created or changed.
+
+## Authentication & Authorization
+- libs/faultline-auth is the ONE shared package with logic in it (also libs/proto and libs/events). Services never import each other.
+- Auth: services verify JWTs locally with faultline-auth and never call the Control Plane per request. Authentication (who) is the library's job. Authorization (workspace, role, resource ownership) is each service's job.
+- The tenant is workspace_id. Take it from the verified token and the URL path, never from request bodies. A workspace or resource that is not the caller's returns 404.
+- Never write code that assumes a user has exactly one workspace. Use workspace_members.

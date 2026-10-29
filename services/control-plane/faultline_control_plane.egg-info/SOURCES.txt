@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 app/__init__.py
 app/api_main.py
@@ -16,6 +17,8 @@ app/projects/__init__.py
 app/projects/models.py
 app/workspaces/__init__.py
 app/workspaces/models.py
+app/workspaces/repository.py
+app/workspaces/service.py
 faultline_control_plane.egg-info/PKG-INFO
 faultline_control_plane.egg-info/SOURCES.txt
 faultline_control_plane.egg-info/dependency_links.txt

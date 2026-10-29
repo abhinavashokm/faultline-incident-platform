@@ -4,12 +4,13 @@ from datetime import timedelta
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from faultline_auth import StaticKeyProvider, TokenVerifier
+from faultline_auth.errors import InvalidToken
 
 from app.auth.security import (
-    InvalidToken,
     create_access_token,
-    decode_access_token,
     hash_password,
+    hash_refresh_token,
     verify_dummy_password,
     verify_password,
 )
@@ -33,42 +34,66 @@ def test_wrong_password() -> None:
     assert verify_dummy_password("AnyPassword") is False
 
 
-def test_token_round_trip(test_keys: tuple[str, str, ...]) -> None:
+def test_hash_refresh_token() -> None:
+    token = "some-random-refresh-token"
+    h1 = hash_refresh_token(token)
+    h2 = hash_refresh_token(token)
+    assert h1 == h2
+    assert len(h1) == 64
+
+
+@pytest.mark.asyncio
+async def test_token_round_trip(test_keys: tuple[str, str, ...]) -> None:
     user_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
+    session_id = uuid.uuid4()
     priv_pem, pub_pem, _, _ = test_keys
 
     token = create_access_token(
         user_id=user_id,
-        workspaces=[],
+        workspace_id=workspace_id,
+        role="owner",
+        sid=session_id,
         private_key=priv_pem,
     )
-    payload = decode_access_token(token, public_key=pub_pem)
 
-    assert payload["sub"] == str(user_id)
-    assert payload["iss"] == settings.jwt_issuer
-    assert payload["aud"] == settings.jwt_audience
-    assert payload["workspaces"] == []
-    assert "exp" in payload
-    assert "iat" in payload
-    assert "jti" in payload
+    verifier = TokenVerifier(
+        StaticKeyProvider(pub_pem, settings.jwt_key_id),
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+    )
+    ctx = await verifier.verify(token)
+
+    assert ctx.user_id == user_id
+    assert ctx.workspace_id == workspace_id
+    assert ctx.role == "owner"
+    assert ctx.session_id == session_id
+    assert ctx.token_id is not None
 
 
-def test_expired_token(test_keys: tuple[str, str, ...]) -> None:
+@pytest.mark.asyncio
+async def test_expired_token(test_keys: tuple[str, str, ...]) -> None:
     user_id = uuid.uuid4()
     priv_pem, pub_pem, _, _ = test_keys
 
-    # Token with negative TTL is already expired
     token = create_access_token(
         user_id=user_id,
         ttl=timedelta(seconds=-10),
         private_key=priv_pem,
     )
 
-    with pytest.raises(InvalidToken, match="Token validation failed"):
-        decode_access_token(token, public_key=pub_pem)
+    verifier = TokenVerifier(
+        StaticKeyProvider(pub_pem, settings.jwt_key_id),
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+        leeway_seconds=0,
+    )
+    with pytest.raises(InvalidToken, match="Signature has expired"):
+        await verifier.verify(token)
 
 
-def test_wrong_audience(test_keys: tuple[str, str, ...]) -> None:
+@pytest.mark.asyncio
+async def test_wrong_audience(test_keys: tuple[str, str, ...]) -> None:
     user_id = uuid.uuid4()
     priv_pem, pub_pem, _, _ = test_keys
 
@@ -78,11 +103,17 @@ def test_wrong_audience(test_keys: tuple[str, str, ...]) -> None:
         private_key=priv_pem,
     )
 
-    with pytest.raises(InvalidToken, match="Token validation failed"):
-        decode_access_token(token, public_key=pub_pem, audience="expected-audience")
+    verifier = TokenVerifier(
+        StaticKeyProvider(pub_pem, settings.jwt_key_id),
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+    )
+    with pytest.raises(InvalidToken, match="Audience doesn't match"):
+        await verifier.verify(token)
 
 
-def test_wrong_issuer(test_keys: tuple[str, str, ...]) -> None:
+@pytest.mark.asyncio
+async def test_wrong_issuer(test_keys: tuple[str, str, ...]) -> None:
     user_id = uuid.uuid4()
     priv_pem, pub_pem, _, _ = test_keys
 
@@ -92,30 +123,40 @@ def test_wrong_issuer(test_keys: tuple[str, str, ...]) -> None:
         private_key=priv_pem,
     )
 
-    with pytest.raises(InvalidToken, match="Token validation failed"):
-        decode_access_token(token, public_key=pub_pem, issuer="expected-issuer")
+    verifier = TokenVerifier(
+        StaticKeyProvider(pub_pem, settings.jwt_key_id),
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+    )
+    with pytest.raises(InvalidToken, match="Invalid issuer"):
+        await verifier.verify(token)
 
 
-def test_tampered_signature(test_keys: tuple[str, str, ...]) -> None:
+@pytest.mark.asyncio
+async def test_tampered_signature(test_keys: tuple[str, str, ...]) -> None:
     user_id = uuid.uuid4()
     priv_pem, pub_pem, _, _ = test_keys
 
     token = create_access_token(user_id=user_id, private_key=priv_pem)
     header, payload, signature = token.split(".")
 
-    # Tamper with signature
     tampered_sig = ("A" if signature[0] != "A" else "B") + signature[1:]
     tampered_token = f"{header}.{payload}.{tampered_sig}"
 
-    with pytest.raises(InvalidToken, match="Token validation failed"):
-        decode_access_token(tampered_token, public_key=pub_pem)
+    verifier = TokenVerifier(
+        StaticKeyProvider(pub_pem, settings.jwt_key_id),
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+    )
+    with pytest.raises(InvalidToken, match="Signature verification failed"):
+        await verifier.verify(tampered_token)
 
 
-def test_token_signed_with_another_key(test_keys: tuple[str, str, ...]) -> None:
+@pytest.mark.asyncio
+async def test_token_signed_with_another_key(test_keys: tuple[str, str, ...]) -> None:
     user_id = uuid.uuid4()
     _, pub_pem, _, _ = test_keys
 
-    # Generate an independent second RSA keypair
     other_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     other_priv_pem = other_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -125,6 +166,10 @@ def test_token_signed_with_another_key(test_keys: tuple[str, str, ...]) -> None:
 
     token = create_access_token(user_id=user_id, private_key=other_priv_pem)
 
-    with pytest.raises(InvalidToken, match="Token validation failed"):
-        decode_access_token(token, public_key=pub_pem)
-
+    verifier = TokenVerifier(
+        StaticKeyProvider(pub_pem, settings.jwt_key_id),
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+    )
+    with pytest.raises(InvalidToken, match="Signature verification failed"):
+        await verifier.verify(token)

@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -21,8 +22,8 @@ class InvalidCredentials(AuthError):
     """Raised when authentication credentials (email/password) are invalid or user inactive."""
 
 
-class InvalidToken(AuthError):
-    """Raised when a JWT is missing, expired, tampered with, or otherwise invalid."""
+class InvalidRefreshToken(AuthError):
+    """Raised when a refresh token is invalid, expired, revoked, or user inactive."""
 
 
 password_hasher = PasswordHasher()
@@ -52,9 +53,17 @@ def verify_dummy_password(password: str) -> bool:
         return False
 
 
+def hash_refresh_token(token: str) -> str:
+    """Compute the SHA-256 hex digest of a refresh token."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def create_access_token(
     user_id: uuid.UUID | str,
-    workspaces: list[dict[str, Any]] | None = None,
+    *,
+    workspace_id: uuid.UUID | str | None = None,
+    role: str | None = None,
+    sid: uuid.UUID | str | None = None,
     ttl: timedelta | None = None,
     now: datetime | None = None,
     private_key: str | None = None,
@@ -63,8 +72,8 @@ def create_access_token(
     audience: str | None = None,
 ) -> str:
     """Create an RS256-signed JWT access token.
-    Claims: iss, aud, sub, iat, exp, jti, workspaces.
-    Does NOT contain email, password hash, or secrets.
+    Claims: iss, aud, sub, type ('access'), jti, iat, exp,
+    and optionally workspace_id, role, sid.
     """
     if private_key is None:
         private_key = settings.get_jwt_private_key()
@@ -86,47 +95,17 @@ def create_access_token(
         "iss": issuer,
         "aud": audience,
         "sub": str(user_id),
+        "type": "access",
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
         "jti": str(uuid.uuid4()),
-        "workspaces": workspaces if workspaces is not None else [],
     }
+    if workspace_id is not None:
+        payload["workspace_id"] = str(workspace_id)
+    if role is not None:
+        payload["role"] = role
+    if sid is not None:
+        payload["sid"] = str(sid)
+
     headers = {"kid": key_id}
     return jwt.encode(payload, private_key, algorithm="RS256", headers=headers)
-
-
-def decode_access_token(
-    token: str,
-    public_key: str | None = None,
-    issuer: str | None = None,
-    audience: str | None = None,
-) -> dict[str, Any]:
-    """Decode and validate an RS256 JWT access token.
-    Enforces algorithm RS256 only, verifies signature, exp, iss, and aud,
-    and requires claims: sub, exp, iat, iss, aud.
-    """
-    if public_key is None:
-        public_key = settings.get_jwt_public_key()
-    if issuer is None:
-        issuer = settings.jwt_issuer
-    if audience is None:
-        audience = settings.jwt_audience
-
-    try:
-        return jwt.decode(
-            token,
-            public_key,
-            algorithms=["RS256"],
-            issuer=issuer,
-            audience=audience,
-            options={
-                "verify_signature": True,
-                "verify_exp": True,
-                "verify_iss": True,
-                "verify_aud": True,
-                "require": ["sub", "exp", "iat", "iss", "aud"],
-            },
-        )
-    except jwt.PyJWTError as exc:
-        raise InvalidToken(f"Token validation failed: {exc}") from exc
-

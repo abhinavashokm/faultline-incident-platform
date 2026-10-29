@@ -154,6 +154,35 @@ Table control.deployments {
   }
 }
 // CHECK: exactly one of deployed_by / deployed_by_key_id is not null
+
+// added for refresh sessions
+Table control.refresh_sessions {
+  id uuid [pk]
+  user_id uuid [not null]
+  created_at timestamptz [not null, default: `now()`]
+  expires_at timestamptz [not null]
+  last_used_at timestamptz
+  revoked_at timestamptz
+  revoked_reason varchar(30)  // CHECK logout|reuse_detected|user_disabled
+
+  indexes {
+    user_id
+  }
+}
+
+Table control.refresh_tokens {
+  id uuid [pk]
+  session_id uuid [not null]
+  token_hash char(64) [not null, unique]
+  created_at timestamptz [not null, default: `now()`]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+
+  indexes {
+    session_id
+  }
+}
+
 // =====================================================
 // RELATIONSHIPS
 // All foreign keys belong to the Control Plane DB
@@ -182,6 +211,9 @@ Ref: control.deployments.(workspace_id, project_id, release_id) > control.releas
 Ref: control.deployments.rollback_of_deployment_id > control.deployments.id
 Ref: control.deployments.deployed_by_key_id > control.project_api_keys.id
 Ref: control.deployments.deployed_by > control.users.id
+
+Ref: control.refresh_sessions.user_id > control.users.id [delete: cascade]
+Ref: control.refresh_tokens.session_id > control.refresh_sessions.id [delete: cascade]
 
 // =====================================================
 // 2. PROCESSING SERVICE

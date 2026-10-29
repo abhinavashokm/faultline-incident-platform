@@ -38,6 +38,23 @@ class SignupRequest(BaseModel):
         return v
 
 
+class WorkspaceSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    slug: str
+
+
+class WorkspaceWithRole(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    role: str | None = None
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -46,6 +63,7 @@ class UserResponse(BaseModel):
     full_name: str
     status: str
     created_at: datetime
+    workspace: WorkspaceSummary | None = None
 
 
 class LoginRequest(BaseModel):
@@ -60,10 +78,29 @@ class LoginRequest(BaseModel):
         return v
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     expires_in: int
+    workspace: WorkspaceWithRole | None = None
+
+
+class MembershipResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    workspace_id: uuid.UUID
+    name: str
+    slug: str
+    role: str
 
 
 class CurrentUserResponse(BaseModel):
@@ -73,7 +110,7 @@ class CurrentUserResponse(BaseModel):
     email: str
     full_name: str
     status: str
-    email_verified_at: datetime | None
+    email_verified_at: datetime | None = None
     created_at: datetime
-    workspaces: list[dict[str, Any]] = Field(default_factory=list)
-
+    workspace: WorkspaceWithRole | None = None
+    memberships: list[MembershipResponse] = Field(default_factory=list)

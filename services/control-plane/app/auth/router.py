@@ -3,16 +3,21 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user
-from app.auth.models import User
+from app.auth.dependencies import AuthContext, current_user
 from app.auth.schemas import (
     CurrentUserResponse,
     LoginRequest,
+    LogoutRequest,
+    RefreshRequest,
     SignupRequest,
     TokenResponse,
     UserResponse,
 )
-from app.auth.security import EmailAlreadyRegistered, InvalidCredentials
+from app.auth.security import (
+    EmailAlreadyRegistered,
+    InvalidCredentials,
+    InvalidRefreshToken,
+)
 from app.auth.service import AuthService
 from app.core.db import get_session
 
@@ -30,8 +35,15 @@ async def signup(
 ) -> UserResponse:
     service = AuthService(session)
     try:
-        user = await service.signup(payload)
-        return UserResponse.model_validate(user)
+        user, workspace = await service.signup(payload)
+        return UserResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            status=user.status,
+            created_at=user.created_at,
+            workspace=workspace,
+        )
     except EmailAlreadyRegistered as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -59,21 +71,57 @@ async def login(
         ) from exc
 
 
+@router.post(
+    "/refresh",
+    status_code=status.HTTP_200_OK,
+    response_model=TokenResponse,
+)
+async def refresh(
+    payload: RefreshRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TokenResponse:
+    service = AuthService(session)
+    try:
+        return await service.refresh(payload)
+    except InvalidRefreshToken as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def logout(
+    payload: LogoutRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> None:
+    service = AuthService(session)
+    await service.logout(payload)
+
+
 @router.get(
     "/me",
     status_code=status.HTTP_200_OK,
     response_model=CurrentUserResponse,
 )
 async def get_me(
-    current_user: Annotated[User, Depends(get_current_user)],
+    ctx: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> CurrentUserResponse:
-    return CurrentUserResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        status=current_user.status,
-        email_verified_at=current_user.email_verified_at,
-        created_at=current_user.created_at,
-        workspaces=[],
-    )
-
+    service = AuthService(session)
+    try:
+        return await service.get_me(
+            user_id=ctx.user_id,
+            token_workspace_id=ctx.workspace_id,
+            token_role=ctx.role,
+        )
+    except InvalidCredentials as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc

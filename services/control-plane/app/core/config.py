@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     jwt_issuer: str = "faultline-control-plane"
     jwt_audience: str = "faultline"
     access_token_ttl_minutes: int = 15
+    refresh_token_ttl_days: int = 7
+    jwks_cache_max_age_seconds: int = 300
 
     def get_jwt_private_key(self) -> str:
         return _read_key_file(self.jwt_private_key_path)
