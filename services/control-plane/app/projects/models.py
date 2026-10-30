@@ -7,12 +7,13 @@ from sqlalchemy import (
     DateTime,
     ForeignKeyConstraint,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -35,6 +36,11 @@ class Project(Base):
             ondelete="RESTRICT",
             name="projects_created_by_fk",
         ),
+        ForeignKeyConstraint(
+            ["archived_by"],
+            [f"{SCHEMA}.users.id"],
+            name="projects_archived_by_fk",
+        ),
         UniqueConstraint("workspace_id", "slug", name="projects_workspace_slug_uq"),
         UniqueConstraint("workspace_id", "id", name="projects_workspace_id_uq"),
         CheckConstraint(
@@ -44,6 +50,11 @@ class Project(Base):
         CheckConstraint(
             "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
             name="projects_slug_ck",
+        ),
+        CheckConstraint(
+            "(status = 'archived' AND archived_at IS NOT NULL AND archived_by IS NOT NULL) "
+            "OR (status = 'active' AND archived_at IS NULL AND archived_by IS NULL)",
+            name="projects_archived_consistency_ck",
         ),
         {"schema": SCHEMA},
     )
@@ -63,6 +74,9 @@ class Project(Base):
     )
     archived_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    archived_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
     )
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -94,6 +108,11 @@ class ProjectApiKey(Base):
             "key_type IN ('ingest', 'release')",
             name="project_api_keys_key_type_ck",
         ),
+        CheckConstraint(
+            "(key_type = 'ingest' AND public_key IS NOT NULL AND key_hash IS NULL AND key_prefix IS NULL) "
+            "OR (key_type = 'release' AND key_hash IS NOT NULL AND key_prefix IS NOT NULL AND public_key IS NULL)",
+            name="project_api_keys_key_type_consistency_ck",
+        ),
         {"schema": SCHEMA},
     )
 
@@ -107,8 +126,8 @@ class ProjectApiKey(Base):
         UUID(as_uuid=True), nullable=False
     )
     key_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    key_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
-    key_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    key_hash: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
+    key_prefix: Mapped[str | None] = mapped_column(String(16), nullable=True)
     public_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(
@@ -125,3 +144,51 @@ class ProjectApiKey(Base):
         DateTime(timezone=True), server_default=text("now()"), nullable=False
     )
 
+
+class ProjectSettings(Base):
+    __tablename__ = "project_settings"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id"],
+            [f"{SCHEMA}.projects.workspace_id", f"{SCHEMA}.projects.id"],
+            ondelete="CASCADE",
+            name="project_settings_project_fk",
+        ),
+        ForeignKeyConstraint(
+            ["updated_by"],
+            [f"{SCHEMA}.users.id"],
+            name="project_settings_updated_by_fk",
+        ),
+        UniqueConstraint("workspace_id", "project_id", name="project_settings_workspace_project_uq"),
+        UniqueConstraint("project_id", name="project_settings_project_id_uq"),
+        CheckConstraint("retention_days > 0", name="project_settings_retention_days_ck"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False
+    )
+    retention_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=30, server_default=text("30")
+    )
+    ignored_status_codes: Mapped[list[int] | None] = mapped_column(
+        ARRAY(Integer), nullable=True
+    )
+    version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default=text("1")
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )

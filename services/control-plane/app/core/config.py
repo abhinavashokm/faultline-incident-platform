@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 7
     jwks_cache_max_age_seconds: int = 300
 
+    dsn_host: str = "errors.example.com"
+    dsn_scheme: str = "https"
+    retention_days_max: int = 90
+
     def get_jwt_private_key(self) -> str:
         return _read_key_file(self.jwt_private_key_path)
 
