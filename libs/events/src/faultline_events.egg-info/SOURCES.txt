@@ -1,0 +1,8 @@
+pyproject.toml
+src/faultline_events/__init__.py
+src/faultline_events/envelope.py
+src/faultline_events.egg-info/PKG-INFO
+src/faultline_events.egg-info/SOURCES.txt
+src/faultline_events.egg-info/dependency_links.txt
+src/faultline_events.egg-info/requires.txt
+src/faultline_events.egg-info/top_level.txt
