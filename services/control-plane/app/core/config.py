@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +40,17 @@ class Settings(BaseSettings):
     dsn_host: str = "errors.example.com"
     dsn_scheme: str = "https"
     retention_days_max: int = 90
+
+    internal_service_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "control_plane_internal_service_secret",
+            "control_plane_service_token",
+            "internal_service_secret",
+            "service_token",
+        ),
+        description="Shared secret for internal service-to-service communication",
+    )
 
     def get_jwt_private_key(self) -> str:
         return _read_key_file(self.jwt_private_key_path)
