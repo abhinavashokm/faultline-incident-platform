@@ -78,7 +78,7 @@ async def truncate_tables(test_engine: AsyncEngine) -> AsyncIterator[None]:
         await conn.execute(
             text(
                 "TRUNCATE TABLE control.refresh_tokens, control.refresh_sessions, "
-                "control.project_api_keys, control.projects, "
+                "control.project_settings, control.project_api_keys, control.projects, "
                 "control.workspace_members, control.workspaces, control.users CASCADE"
             )
         )
@@ -87,7 +87,7 @@ async def truncate_tables(test_engine: AsyncEngine) -> AsyncIterator[None]:
         await conn.execute(
             text(
                 "TRUNCATE TABLE control.refresh_tokens, control.refresh_sessions, "
-                "control.project_api_keys, control.projects, "
+                "control.project_settings, control.project_api_keys, control.projects, "
                 "control.workspace_members, control.workspaces, control.users CASCADE"
             )
         )
