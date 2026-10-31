@@ -5,7 +5,6 @@ import {
   checkFirstEventStatusApi,
 } from "./api";
 import { CreateProjectFormData } from "./schemas";
-import { PlatformId } from "./types";
 
 export function useCreateProject() {
   return useMutation({
@@ -13,10 +12,10 @@ export function useCreateProject() {
   });
 }
 
-export function useSdkConfig(platform: PlatformId) {
+export function useSdkConfig() {
   return useQuery({
-    queryKey: ["sdk-config", platform],
-    queryFn: () => getSdkConfigApi(platform),
+    queryKey: ["sdk-config"],
+    queryFn: () => getSdkConfigApi(),
   });
 }
 
@@ -27,4 +26,3 @@ export function useLiveEventStatus(projectId?: string) {
     refetchInterval: 3000,
   });
 }
-

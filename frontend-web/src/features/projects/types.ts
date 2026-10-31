@@ -1,24 +1,7 @@
-export type PlatformId =
-  | "python"
-  | "javascript"
-  | "node"
-  | "java"
-  | "go"
-  | "other";
-
-export interface PlatformOption {
-  id: PlatformId;
-  name: string;
-  tagline: string;
-  badge?: string;
-  iconName: string;
-}
-
 export interface Project {
   id: string;
   name: string;
   slug: string;
-  platform: PlatformId;
   environment: string;
   dsn: string;
   apiKey: string;
@@ -27,7 +10,7 @@ export interface Project {
 }
 
 export interface SdkConfig {
-  platform: PlatformId;
+  name: string;
   installCommand: string;
   initSnippet: string;
   envSnippet: string;
@@ -44,4 +27,3 @@ export interface LiveStatusEvent {
     ip: string;
   };
 }
-

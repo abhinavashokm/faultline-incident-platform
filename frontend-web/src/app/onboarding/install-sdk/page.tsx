@@ -17,23 +17,19 @@ import {
 
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSdkConfig, useLiveEventStatus } from "@/features/projects/hooks";
-import { PlatformId } from "@/features/projects/types";
 
 function InstallSdkContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const projectName = searchParams.get("name") || "Payments API";
-  const initialPlatform = (searchParams.get("platform") as PlatformId) || "python";
   const projectId = searchParams.get("projectId") || "proj_9a82f1b4";
 
-  const [activePlatform, setActivePlatform] = useState<PlatformId>(initialPlatform);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [showKey, setShowKey] = useState<boolean>(false);
 
-  const { data: config, isLoading } = useSdkConfig(activePlatform);
+  const { data: config, isLoading } = useSdkConfig();
   useLiveEventStatus(projectId);
 
   const handleCopy = (text: string, section: string) => {
@@ -96,7 +92,7 @@ function InstallSdkContent() {
               Connect your application
             </h1>
             <p className="text-body-sm text-text-secondary mt-0.5">
-              Install the Faultline SDK to start capturing errors, performance regressions, and traces.
+              Install the Faultline Python SDK to start capturing errors, performance regressions, and traces.
             </p>
           </div>
 
@@ -216,127 +212,121 @@ function InstallSdkContent() {
           </div>
         </div>
 
-        {/* Instructions by Platform */}
+        {/* Python Instructions Card */}
         <div className="rounded-lg border border-border bg-card p-6 shadow-level-1">
-          <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h2 className="text-headline-sm font-semibold text-text-primary">
-                SDK Installation &amp; Configuration
-              </h2>
-              <p className="text-body-sm text-text-secondary">
-                Select your language or runtime to view the setup instructions.
-              </p>
+          <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-md bg-canvas border border-border shadow-level-1">
+                <Terminal className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-headline-sm font-semibold text-text-primary">
+                  Python SDK Setup
+                </h2>
+                <p className="text-body-sm text-text-secondary">
+                  Works with FastAPI, Starlette, Django, Flask, Celery, and custom ASGI/WSGI applications.
+                </p>
+              </div>
             </div>
+            <span className="text-label-sm font-mono px-2 py-0.5 rounded bg-primary-tint border border-primary-subdued text-primary font-semibold">
+              v1.0.0
+            </span>
           </div>
 
-          <Tabs
-            defaultValue={activePlatform}
-            onValueChange={(val) => setActivePlatform(val as PlatformId)}
-          >
-            <TabsList className="mb-6 flex flex-wrap h-auto gap-1">
-              <TabsTrigger value="python">Python</TabsTrigger>
-              <TabsTrigger value="javascript">JavaScript / React</TabsTrigger>
-              <TabsTrigger value="node">Node.js</TabsTrigger>
-              <TabsTrigger value="java">Java / Spring</TabsTrigger>
-              <TabsTrigger value="go">Go</TabsTrigger>
-              <TabsTrigger value="other">OpenTelemetry</TabsTrigger>
-            </TabsList>
-
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12 text-text-muted">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Step 1: Package Install */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-body-sm font-semibold text-text-primary">
-                      1. Install package
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(config?.installCommand || "", "install")}
-                      className="inline-flex items-center gap-1.5 text-label-sm text-text-secondary hover:text-text-primary font-medium"
-                    >
-                      {copiedSection === "install" ? (
-                        <>
-                          <Check className="h-3.5 w-3.5 text-success" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" />
-                          <span>Copy command</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="rounded-md border border-border bg-canvas p-3 font-mono text-[12px] text-text-primary flex items-center justify-between overflow-x-auto">
-                    <code>{config?.installCommand}</code>
-                  </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12 text-text-muted">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Step 1: Package Install */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-body-sm font-semibold text-text-primary">
+                    1. Install package via pip
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(config?.installCommand || "", "install")}
+                    className="inline-flex items-center gap-1.5 text-label-sm text-text-secondary hover:text-text-primary font-medium"
+                  >
+                    {copiedSection === "install" ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy command</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-
-                {/* Step 2: Initialize */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-body-sm font-semibold text-text-primary">
-                      2. Initialize SDK in application code
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(config?.initSnippet || "", "init")}
-                      className="inline-flex items-center gap-1.5 text-label-sm text-text-secondary hover:text-text-primary font-medium"
-                    >
-                      {copiedSection === "init" ? (
-                        <>
-                          <Check className="h-3.5 w-3.5 text-success" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" />
-                          <span>Copy snippet</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="rounded-md border border-border bg-canvas p-4 font-mono text-[12px] text-text-primary overflow-x-auto whitespace-pre">
-                    <code>{config?.initSnippet}</code>
-                  </div>
-                </div>
-
-                {/* Step 3: Environment Credentials */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-body-sm font-semibold text-text-primary">
-                      3. (Optional) Set environment variables
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(config?.envSnippet || "", "env")}
-                      className="inline-flex items-center gap-1.5 text-label-sm text-text-secondary hover:text-text-primary font-medium"
-                    >
-                      {copiedSection === "env" ? (
-                        <>
-                          <Check className="h-3.5 w-3.5 text-success" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="rounded-md border border-border bg-canvas p-3 font-mono text-[12px] text-text-primary overflow-x-auto">
-                    <code>{config?.envSnippet}</code>
-                  </div>
+                <div className="rounded-md border border-border bg-canvas p-3 font-mono text-[12px] text-text-primary flex items-center justify-between overflow-x-auto">
+                  <code>{config?.installCommand}</code>
                 </div>
               </div>
-            )}
-          </Tabs>
+
+              {/* Step 2: Initialize */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-body-sm font-semibold text-text-primary">
+                    2. Initialize SDK in application code
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(config?.initSnippet || "", "init")}
+                    className="inline-flex items-center gap-1.5 text-label-sm text-text-secondary hover:text-text-primary font-medium"
+                  >
+                    {copiedSection === "init" ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy snippet</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="rounded-md border border-border bg-canvas p-4 font-mono text-[12px] text-text-primary overflow-x-auto whitespace-pre">
+                  <code>{config?.initSnippet}</code>
+                </div>
+              </div>
+
+              {/* Step 3: Environment Credentials */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-body-sm font-semibold text-text-primary">
+                    3. (Optional) Set environment credentials
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(config?.envSnippet || "", "env")}
+                    className="inline-flex items-center gap-1.5 text-label-sm text-text-secondary hover:text-text-primary font-medium"
+                  >
+                    {copiedSection === "env" ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-success" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="rounded-md border border-border bg-canvas p-3 font-mono text-[12px] text-text-primary overflow-x-auto">
+                  <code>{config?.envSnippet}</code>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-8 pt-4 border-t border-border flex items-center justify-between">
             <Link

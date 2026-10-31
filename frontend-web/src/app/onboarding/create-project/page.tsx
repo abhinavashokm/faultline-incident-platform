@@ -1,16 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Terminal,
-  Code2,
-  Cpu,
-  Coffee,
-  Boxes,
-  Radio,
   ArrowRight,
   Loader2,
   CheckCircle2,
@@ -40,71 +35,15 @@ import {
   CreateProjectFormData,
 } from "@/features/projects/schemas";
 import { useCreateProject } from "@/features/projects/hooks";
-import { PlatformId } from "@/features/projects/types";
-
-interface PlatformOption {
-  id: PlatformId;
-  name: string;
-  tagline: string;
-  badge?: string;
-  icon: React.ReactNode;
-}
-
-const PLATFORMS: PlatformOption[] = [
-  {
-    id: "python",
-    name: "Python",
-    tagline: "FastAPI, Django, Flask ASGI",
-    badge: "Auto-instrument",
-    icon: <Terminal className="h-5 w-5 text-primary" />,
-  },
-  {
-    id: "javascript",
-    name: "JavaScript / Web",
-    tagline: "Next.js, React, Browser DOM",
-    badge: "App Router",
-    icon: <Code2 className="h-5 w-5 text-warning" />,
-  },
-  {
-    id: "node",
-    name: "Node.js",
-    tagline: "Express, NestJS, Worker Threads",
-    badge: "v18+ LTS",
-    icon: <Cpu className="h-5 w-5 text-success" />,
-  },
-  {
-    id: "java",
-    name: "Java",
-    tagline: "Spring Boot, Micronaut, Quarkus",
-    badge: "JVM 17+",
-    icon: <Coffee className="h-5 w-5 text-error" />,
-  },
-  {
-    id: "go",
-    name: "Go",
-    tagline: "Standard Net/HTTP, Gin, Fiber",
-    badge: "Low latency",
-    icon: <Boxes className="h-5 w-5 text-info" />,
-  },
-  {
-    id: "other",
-    name: "Other / OpenTelemetry",
-    tagline: "Custom telemetry & OTLP daemon",
-    badge: "OTel OTLP",
-    icon: <Radio className="h-5 w-5 text-ai" />,
-  },
-];
 
 export default function CreateProjectPage() {
   const router = useRouter();
-  const [selectedPlatform, setSelectedPlatform] = useState<PlatformId>("python");
 
   const form = useForm<CreateProjectFormData>({
     resolver: zodResolver(createProjectSchema),
     defaultValues: {
       name: "",
       slug: "",
-      platform: "python",
       environment: "production",
     },
     mode: "onChange",
@@ -123,16 +62,11 @@ export default function CreateProjectPage() {
     form.setValue("slug", slug, { shouldValidate: true });
   };
 
-  const handleSelectPlatform = (id: PlatformId) => {
-    setSelectedPlatform(id);
-    form.setValue("platform", id, { shouldValidate: true });
-  };
-
   function onSubmit(values: CreateProjectFormData) {
     createProject(values, {
       onSuccess: (project) => {
         router.push(
-          `/onboarding/install-sdk?projectId=${project.id}&platform=${project.platform}&name=${encodeURIComponent(
+          `/onboarding/install-sdk?projectId=${project.id}&name=${encodeURIComponent(
             project.name
           )}`
         );
@@ -183,7 +117,7 @@ export default function CreateProjectPage() {
               Create your project
             </h1>
             <p className="text-body-sm text-text-secondary mt-1">
-              Choose the application runtime you want to monitor. You can configure the SDK in the next step.
+              Give your service a name and configure your default environment. You can set up the SDK in the next step.
             </p>
           </div>
 
@@ -207,7 +141,7 @@ export default function CreateProjectPage() {
                       </FormControl>
                       <p className="text-[11px] text-text-muted flex items-center gap-1">
                         <Info className="h-3 w-3" />
-                        Identifies this service in issues & incidents.
+                        Identifies this service in issues &amp; incidents.
                       </p>
                       <FormMessage />
                     </FormItem>
@@ -236,53 +170,42 @@ export default function CreateProjectPage() {
                 />
               </div>
 
-              {/* Platform Picker */}
+              {/* Supported Platform (Single Python Card) */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <FormLabel>Select Platform *</FormLabel>
+                  <FormLabel>Runtime Platform</FormLabel>
                   <span className="text-label-sm text-text-muted">
-                    SDK auto-tuning &amp; symbolication
+                    Auto-instrumented SDK
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {PLATFORMS.map((p) => {
-                    const isSelected = selectedPlatform === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleSelectPlatform(p.id)}
-                        disabled={isPending}
-                        className={`text-left p-3.5 rounded-lg border transition-all relative flex flex-col justify-between h-28 ${
-                          isSelected
-                            ? "border-primary bg-primary-tint/60 shadow-level-1 ring-2 ring-primary-subdued"
-                            : "border-border bg-card hover:bg-canvas hover:border-border-hover"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between w-full">
-                          <div className="p-1.5 rounded-md bg-card border border-border shadow-level-1">
-                            {p.icon}
-                          </div>
-                          {p.badge && (
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-card border border-border text-text-secondary">
-                              {p.badge}
-                            </span>
-                          )}
-                        </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Pre-selected non-interactive Python card */}
+                  <div className="p-4 rounded-lg border border-primary bg-primary-tint/60 shadow-level-1 ring-2 ring-primary-subdued relative flex flex-col justify-between h-28 select-none">
+                    <div className="flex items-start justify-between w-full">
+                      <div className="p-1.5 rounded-md bg-card border border-border shadow-level-1">
+                        <Terminal className="h-5 w-5 text-primary" />
+                      </div>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-card border border-border text-primary font-semibold">
+                        Supported
+                      </span>
+                    </div>
 
-                        <div>
-                          <div className="text-body-sm font-semibold text-text-primary">
-                            {p.name}
-                          </div>
-                          <div className="text-[11px] text-text-secondary truncate mt-0.5">
-                            {p.tagline}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                    <div>
+                      <div className="text-body-sm font-semibold text-text-primary">
+                        Python
+                      </div>
+                      <div className="text-[11px] text-text-secondary truncate mt-0.5">
+                        FastAPI, Django, Flask ASGI, and Celery
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
+                <p className="text-label-sm text-text-muted flex items-center gap-1.5 pt-1">
+                  <Info className="h-3.5 w-3.5" />
+                  <span>More SDKs coming soon (JavaScript, Node.js, Go, Java).</span>
+                </p>
               </div>
 
               {/* Environment (Optional) */}
@@ -351,4 +274,3 @@ export default function CreateProjectPage() {
     </div>
   );
 }
-
