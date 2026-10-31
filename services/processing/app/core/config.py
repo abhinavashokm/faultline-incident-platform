@@ -67,5 +67,57 @@ class Settings(BaseSettings):
         description="Logging level",
     )
 
+    # Authentication & JWT verification
+    auth_provider: str = Field(
+        default="static",
+        validation_alias=AliasChoices("auth_provider", "jwt_provider"),
+        description="Auth key provider: 'static' or 'jwks'",
+    )
+    auth_issuer: str = Field(
+        default="faultline-control-plane",
+        validation_alias=AliasChoices("auth_issuer", "jwt_issuer"),
+        description="Expected JWT issuer",
+    )
+    auth_audience: str = Field(
+        default="faultline",
+        validation_alias=AliasChoices("auth_audience", "jwt_audience"),
+        description="Expected JWT audience",
+    )
+    auth_leeway_seconds: int = Field(
+        default=30,
+        validation_alias=AliasChoices("auth_leeway_seconds", "jwt_leeway_seconds", "auth_leeway"),
+        description="Clock-skew leeway in seconds (<= 30)",
+    )
+    auth_public_key_path: str = Field(
+        default="",
+        validation_alias=AliasChoices("auth_public_key_path", "jwt_public_key_path", "public_key_path"),
+        description="Path to static RSA public key PEM file",
+    )
+    auth_jwt_key_id: str = Field(
+        default="dev-1",
+        validation_alias=AliasChoices("auth_jwt_key_id", "jwt_key_id"),
+        description="Key ID for static public key",
+    )
+    auth_jwks_url: str = Field(
+        default="http://localhost:8000/.well-known/jwks.json",
+        validation_alias=AliasChoices("auth_jwks_url", "jwks_url"),
+        description="Control Plane JWKS URL",
+    )
+    auth_jwks_cache_ttl_seconds: int = Field(
+        default=300,
+        validation_alias=AliasChoices("auth_jwks_cache_ttl_seconds", "jwks_cache_ttl_seconds"),
+        description="JWKS key cache TTL in seconds",
+    )
+    auth_jwks_refetch_cooldown_seconds: int = Field(
+        default=30,
+        validation_alias=AliasChoices("auth_jwks_refetch_cooldown_seconds", "jwks_refetch_cooldown_seconds"),
+        description="Cooldown between JWKS refetches on unknown kid",
+    )
+    auth_jwks_timeout_seconds: float = Field(
+        default=3.0,
+        validation_alias=AliasChoices("auth_jwks_timeout_seconds", "jwks_timeout_seconds"),
+        description="HTTP timeout for JWKS fetch",
+    )
+
 
 settings = Settings()

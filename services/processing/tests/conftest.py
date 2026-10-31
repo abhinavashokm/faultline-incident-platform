@@ -110,3 +110,53 @@ async def unauth_client(
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+@pytest.fixture(scope="session")
+def rsa_keys(tmp_path_factory):
+    """Generate ephemeral RSA keypair and temporary public key file for testing."""
+    import json
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from jwt.algorithms import RSAAlgorithm
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_key = private_key.public_key()
+
+    priv_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
+
+    pub_pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("utf-8")
+
+    kid = "dev-1"
+    jwk_dict = json.loads(RSAAlgorithm.to_jwk(public_key))
+    jwk_dict["kid"] = kid
+    jwk_dict["use"] = "sig"
+    jwk_dict["alg"] = "RS256"
+
+    key_dir = tmp_path_factory.mktemp("test_keys")
+    pub_key_path = str(key_dir / "public.pem")
+    with open(pub_key_path, "w", encoding="utf-8") as f:
+        f.write(pub_pem)
+
+    return {
+        "private_key": private_key,
+        "public_key": public_key,
+        "private_pem": priv_pem,
+        "public_pem": pub_pem,
+        "pub_key_path": pub_key_path,
+        "kid": kid,
+        "jwk": jwk_dict,
+        "jwks": {"keys": [jwk_dict]},
+    }
+
+
+
+
+

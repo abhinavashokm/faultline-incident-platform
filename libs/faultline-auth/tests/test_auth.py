@@ -15,6 +15,7 @@ from faultline_auth import (
     AuthContext,
     AuthDependencies,
     InvalidToken,
+    InvalidWorkspaceClaim,
     JwksKeyProvider,
     KeysUnavailable,
     StaticKeyProvider,
@@ -409,3 +410,210 @@ async def test_require_role_enforcement(rsa_keypair):
             headers={"Authorization": f"Bearer {owner_token}"},
         )
         assert res.status_code == 200
+
+
+# 16. Token signed by different RSA private key is rejected
+@pytest.mark.asyncio
+async def test_bad_signature_other_rsa_key(rsa_keypair):
+    kp = StaticKeyProvider(rsa_keypair["public_pem"], rsa_keypair["kid"])
+    verifier = TokenVerifier(kp, issuer="faultline-control-plane", audience="faultline")
+
+    other_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    token = make_token(other_private_key, kid=rsa_keypair["kid"])
+
+    with pytest.raises(InvalidToken, match="Signature verification failed"):
+        await verifier.verify(token)
+
+
+# 17. Malformed tokens are rejected
+@pytest.mark.asyncio
+async def test_malformed_tokens(rsa_keypair):
+    kp = StaticKeyProvider(rsa_keypair["public_pem"], rsa_keypair["kid"])
+    verifier = TokenVerifier(kp, issuer="faultline-control-plane", audience="faultline")
+
+    for malformed in ["", "not-a-token", "a.b", "header.payload.signature.extra", "eyJhbGciOi.bad"]:
+        with pytest.raises(InvalidToken):
+            await verifier.verify(malformed)
+
+
+# 18. Token with alg none is rejected
+@pytest.mark.asyncio
+async def test_alg_none_rejected(rsa_keypair):
+    kp = StaticKeyProvider(rsa_keypair["public_pem"], rsa_keypair["kid"])
+    verifier = TokenVerifier(kp, issuer="faultline-control-plane", audience="faultline")
+
+    now = datetime.now(timezone.utc)
+    payload = {
+        "iss": "faultline-control-plane",
+        "aud": "faultline",
+        "sub": str(uuid.uuid4()),
+        "type": "access",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=15)).timestamp()),
+        "jti": str(uuid.uuid4()),
+    }
+    token = jwt.encode(payload, key="", algorithm="none", headers={"kid": rsa_keypair["kid"]})
+    with pytest.raises(InvalidToken, match="Unsupported algorithm 'none'"):
+        await verifier.verify(token)
+
+
+# 19. HS256 signed with public key PEM as secret is rejected
+@pytest.mark.asyncio
+async def test_hs256_with_public_pem_as_secret(rsa_keypair):
+    import base64
+    import hashlib
+    import hmac
+
+    kp = StaticKeyProvider(rsa_keypair["public_pem"], rsa_keypair["kid"])
+    verifier = TokenVerifier(kp, issuer="faultline-control-plane", audience="faultline")
+
+    now = datetime.now(timezone.utc)
+    payload = {
+        "iss": "faultline-control-plane",
+        "aud": "faultline",
+        "sub": str(uuid.uuid4()),
+        "type": "access",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=15)).timestamp()),
+        "jti": str(uuid.uuid4()),
+    }
+    header_json = json.dumps({"alg": "HS256", "kid": rsa_keypair["kid"]}).encode()
+    payload_json = json.dumps(payload).encode()
+    header_b64 = base64.urlsafe_b64encode(header_json).rstrip(b"=").decode()
+    payload_b64 = base64.urlsafe_b64encode(payload_json).rstrip(b"=").decode()
+    signing_input = f"{header_b64}.{payload_b64}".encode()
+    sig = base64.urlsafe_b64encode(
+        hmac.new(rsa_keypair["public_pem"].encode(), signing_input, hashlib.sha256).digest()
+    ).rstrip(b"=").decode()
+    forged_token = f"{header_b64}.{payload_b64}.{sig}"
+
+    with pytest.raises(InvalidToken, match="Unsupported algorithm 'HS256'"):
+        await verifier.verify(forged_token)
+
+
+# 20. Non-UUID subject claim raises InvalidToken
+@pytest.mark.asyncio
+async def test_non_uuid_sub(rsa_keypair):
+    kp = StaticKeyProvider(rsa_keypair["public_pem"], rsa_keypair["kid"])
+    verifier = TokenVerifier(kp, issuer="faultline-control-plane", audience="faultline")
+
+    token = make_token(rsa_keypair["private_key"], kid=rsa_keypair["kid"], sub="not-a-valid-uuid")
+    with pytest.raises(InvalidToken, match="Invalid sub UUID"):
+        await verifier.verify(token)
+
+
+# 21. Non-UUID workspace_id claim raises InvalidWorkspaceClaim (subclass of InvalidToken)
+@pytest.mark.asyncio
+async def test_non_uuid_workspace_id(rsa_keypair):
+    kp = StaticKeyProvider(rsa_keypair["public_pem"], rsa_keypair["kid"])
+    verifier = TokenVerifier(kp, issuer="faultline-control-plane", audience="faultline")
+
+    token = make_token(rsa_keypair["private_key"], kid=rsa_keypair["kid"], workspace_id="not-a-valid-uuid")
+    with pytest.raises(InvalidWorkspaceClaim, match="Invalid workspace_id UUID") as exc_info:
+        await verifier.verify(token)
+    assert isinstance(exc_info.value, InvalidToken)
+
+
+# 22. Contract test: Control Plane token shape round-trip with StaticKeyProvider and JwksKeyProvider
+@pytest.mark.asyncio
+async def test_contract_control_plane_token_shape(rsa_keypair):
+    user_id = uuid.uuid4()
+    workspace_id = uuid.uuid4()
+    session_id = uuid.uuid4()
+    token_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=15)
+
+    payload = {
+        "iss": "faultline-control-plane",
+        "aud": "faultline",
+        "sub": str(user_id),
+        "type": "access",
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+        "jti": str(token_id),
+        "workspace_id": str(workspace_id),
+        "role": "owner",
+        "sid": str(session_id),
+    }
+    token = jwt.encode(payload, rsa_keypair["private_key"], algorithm="RS256", headers={"kid": "dev-1"})
+
+    # 1. Verify with StaticKeyProvider
+    static_kp = StaticKeyProvider(rsa_keypair["public_pem"], kid="dev-1")
+    verifier_static = TokenVerifier(static_kp, issuer="faultline-control-plane", audience="faultline")
+    ctx = await verifier_static.verify(token)
+
+    assert ctx.user_id == user_id
+    assert ctx.workspace_id == workspace_id
+    assert ctx.role == "owner"
+    assert ctx.session_id == session_id
+    assert ctx.token_id == str(token_id)
+    assert ctx.expires_at == datetime.fromtimestamp(int(exp.timestamp()), tz=timezone.utc)
+
+    # 2. Verify with JwksKeyProvider (mocking exact Control Plane JWKS response)
+    jwks_data = {
+        "keys": [{
+            "kty": "RSA",
+            "use": "sig",
+            "alg": "RS256",
+            "kid": "dev-1",
+            "n": rsa_keypair["jwk"]["n"],
+            "e": rsa_keypair["jwk"]["e"],
+        }]
+    }
+
+    transport = httpx.MockTransport(lambda req: httpx.Response(200, json=jwks_data))
+    async with httpx.AsyncClient(transport=transport) as client:
+        jwks_kp = JwksKeyProvider("http://control-plane:8000/.well-known/jwks.json", client=client)
+        verifier_jwks = TokenVerifier(jwks_kp, issuer="faultline-control-plane", audience="faultline")
+        ctx_jwks = await verifier_jwks.verify(token)
+
+        assert ctx_jwks.user_id == user_id
+        assert ctx_jwks.workspace_id == workspace_id
+        assert ctx_jwks.role == "owner"
+
+
+# 23. JWKS cache hit avoids repeat HTTP calls
+@pytest.mark.asyncio
+async def test_jwks_cache_hit(rsa_keypair):
+    call_count = 0
+
+    def jwks_handler(request):
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(200, json=rsa_keypair["jwks"])
+
+    transport = httpx.MockTransport(jwks_handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = JwksKeyProvider(
+            "https://control.internal/.well-known/jwks.json",
+            cache_ttl_seconds=300,
+            client=client,
+        )
+        verifier = TokenVerifier(provider, issuer="faultline-control-plane", audience="faultline")
+
+        token1 = make_token(rsa_keypair["private_key"], kid=rsa_keypair["kid"])
+        token2 = make_token(rsa_keypair["private_key"], kid=rsa_keypair["kid"])
+
+        ctx1 = await verifier.verify(token1)
+        ctx2 = await verifier.verify(token2)
+
+        assert ctx1 is not None
+        assert ctx2 is not None
+        assert call_count == 1
+
+
+# 24. Library imports with no environment variables set and no Control Plane code
+def test_clean_import_in_isolated_environment():
+    import subprocess
+    import sys
+
+    res = subprocess.run(
+        [sys.executable, "-c", "import faultline_auth; print('OK')"],
+        capture_output=True,
+        text=True,
+        env={},
+    )
+    assert res.returncode == 0
+    assert "OK" in res.stdout
+

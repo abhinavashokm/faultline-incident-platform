@@ -6,7 +6,7 @@ from uuid import UUID
 import jwt
 
 from faultline_auth.context import AuthContext
-from faultline_auth.errors import InvalidToken, KeysUnavailable
+from faultline_auth.errors import InvalidToken, InvalidWorkspaceClaim, KeysUnavailable
 from faultline_auth.keys import KeyProvider
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ class TokenVerifier:
             try:
                 workspace_id = UUID(str(payload["workspace_id"]))
             except (ValueError, TypeError) as exc:
-                raise InvalidToken(f"Invalid workspace_id UUID: {exc}") from exc
+                raise InvalidWorkspaceClaim(f"Invalid workspace_id UUID: {exc}") from exc
 
         session_id: UUID | None = None
         if "sid" in payload and payload["sid"] is not None:
