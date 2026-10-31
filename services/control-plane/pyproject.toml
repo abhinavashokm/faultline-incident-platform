@@ -16,6 +16,7 @@ dependencies = [
     "argon2-cffi",
     "pyjwt[crypto]",
     "pydantic[email]",
+    "aiosmtplib",
 ]
 
 [project.optional-dependencies]

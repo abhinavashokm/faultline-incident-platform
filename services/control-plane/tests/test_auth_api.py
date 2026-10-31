@@ -6,13 +6,23 @@ import jwt
 import pytest
 from faultline_auth import JwksKeyProvider, TokenVerifier
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import RefreshSession, RefreshToken, User
 from app.auth.security import create_access_token
 from app.core.config import settings
 from app.workspaces.models import Workspace, WorkspaceMember
+
+
+async def mark_email_verified(db_session: AsyncSession, email: str) -> None:
+    stmt = (
+        update(User)
+        .where(User.email == email)
+        .values(email_verified_at=datetime.now(timezone.utc))
+    )
+    await db_session.execute(stmt)
+    await db_session.commit()
 
 
 @pytest.mark.asyncio
@@ -144,6 +154,7 @@ async def test_login_success_and_token_claims(
     assert signup_resp.status_code == 201
     user_id = signup_resp.json()["id"]
     workspace_id = signup_resp.json()["workspace"]["id"]
+    await mark_email_verified(db_session, "login_user@example.com")
 
     login_payload = {
         "email": "login_user@example.com",
@@ -196,6 +207,7 @@ async def test_user_without_membership_gets_token_without_workspace_claims(
     }
     signup_resp = await client.post("/api/v1/auth/signup", json=signup_payload)
     user_id = uuid.UUID(signup_resp.json()["id"])
+    await mark_email_verified(db_session, "nomember@example.com")
 
     # Remove workspace membership from DB
     member_stmt = select(WorkspaceMember).where(WorkspaceMember.user_id == user_id)
@@ -282,7 +294,7 @@ async def test_login_suspended_user(
 
 @pytest.mark.asyncio
 async def test_refresh_token_rotation_and_old_token_invalidation(
-    client: AsyncClient,
+    client: AsyncClient, db_session: AsyncSession
 ) -> None:
     signup_payload = {
         "email": "refresh_user@example.com",
@@ -290,6 +302,7 @@ async def test_refresh_token_rotation_and_old_token_invalidation(
         "full_name": "Refresh User",
     }
     await client.post("/api/v1/auth/signup", json=signup_payload)
+    await mark_email_verified(db_session, "refresh_user@example.com")
 
     login_resp = await client.post(
         "/api/v1/auth/login",
@@ -324,6 +337,7 @@ async def test_refresh_token_reuse_revokes_session(
         "full_name": "Reuse User",
     }
     await client.post("/api/v1/auth/signup", json=signup_payload)
+    await mark_email_verified(db_session, "reuse_user@example.com")
 
     login_resp = await client.post(
         "/api/v1/auth/login",
@@ -355,13 +369,16 @@ async def test_refresh_token_reuse_revokes_session(
 
 
 @pytest.mark.asyncio
-async def test_logout_revokes_session(client: AsyncClient) -> None:
+async def test_logout_revokes_session(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
     signup_payload = {
         "email": "logout_user@example.com",
         "password": "ChangeMe-Strong-Password",
         "full_name": "Logout User",
     }
     await client.post("/api/v1/auth/signup", json=signup_payload)
+    await mark_email_verified(db_session, "logout_user@example.com")
 
     login_resp = await client.post(
         "/api/v1/auth/login",
@@ -395,6 +412,7 @@ async def test_expired_refresh_token_fails(
         "full_name": "Expired RT User",
     }
     await client.post("/api/v1/auth/signup", json=signup_payload)
+    await mark_email_verified(db_session, "expired_rt@example.com")
 
     login_resp = await client.post(
         "/api/v1/auth/login",
@@ -429,6 +447,7 @@ async def test_disabled_user_cannot_refresh(
     }
     signup_resp = await client.post("/api/v1/auth/signup", json=signup_payload)
     user_id = uuid.UUID(signup_resp.json()["id"])
+    await mark_email_verified(db_session, "disabled_rt@example.com")
 
     login_resp = await client.post(
         "/api/v1/auth/login",
@@ -464,6 +483,7 @@ async def test_refresh_picks_up_changed_role(
     }
     signup_resp = await client.post("/api/v1/auth/signup", json=signup_payload)
     user_id = uuid.UUID(signup_resp.json()["id"])
+    await mark_email_verified(db_session, "role_change@example.com")
 
     login_resp = await client.post(
         "/api/v1/auth/login",
@@ -492,7 +512,9 @@ async def test_refresh_picks_up_changed_role(
 
 
 @pytest.mark.asyncio
-async def test_me_with_valid_and_invalid_token(client: AsyncClient) -> None:
+async def test_me_with_valid_and_invalid_token(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
     signup_payload = {
         "email": "me_user@example.com",
         "password": "ChangeMe-Strong-Password",
@@ -501,6 +523,7 @@ async def test_me_with_valid_and_invalid_token(client: AsyncClient) -> None:
     signup_resp = await client.post("/api/v1/auth/signup", json=signup_payload)
     user_id = signup_resp.json()["id"]
     workspace_id = signup_resp.json()["workspace"]["id"]
+    await mark_email_verified(db_session, "me_user@example.com")
 
     login_payload = {
         "email": "me_user@example.com",
@@ -554,7 +577,9 @@ async def test_me_with_valid_and_invalid_token(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_jwks_endpoint_and_token_verification(client: AsyncClient) -> None:
+async def test_jwks_endpoint_and_token_verification(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
     # 1. Fetch JWKS from endpoint
     jwks_resp = await client.get("/.well-known/jwks.json")
     assert jwks_resp.status_code == 200
@@ -583,6 +608,7 @@ async def test_jwks_endpoint_and_token_verification(client: AsyncClient) -> None
         "full_name": "JWKS User",
     }
     await client.post("/api/v1/auth/signup", json=signup_payload)
+    await mark_email_verified(db_session, "jwks_user@example.com")
     login_resp = await client.post(
         "/api/v1/auth/login",
         json={"email": "jwks_user@example.com", "password": "ChangeMe-Strong-Password"},

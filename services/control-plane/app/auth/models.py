@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKeyConstraint,
     Index,
+    Integer,
     String,
     UniqueConstraint,
     text,
@@ -15,6 +16,7 @@ from sqlalchemy.dialects.postgresql import CITEXT, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
+from app.core.uuid7 import uuid7
 
 SCHEMA = "control"
 
@@ -121,6 +123,52 @@ class RefreshToken(Base):
     )
     used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+
+class EmailVerificationCode(Base):
+    __tablename__ = "email_verification_codes"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id"],
+            [f"{SCHEMA}.users.id"],
+            ondelete="CASCADE",
+            name="email_verification_codes_user_fk",
+        ),
+        CheckConstraint(
+            "attempts >= 0",
+            name="email_verification_codes_attempts_ck",
+        ),
+        CheckConstraint(
+            "expires_at > created_at",
+            name="email_verification_codes_expires_at_ck",
+        ),
+        Index(
+            "email_verification_codes_user_id_active_uq",
+            "user_id",
+            unique=True,
+            postgresql_where=text("consumed_at IS NULL"),
+        ),
+        Index("email_verification_codes_expires_at_idx", "expires_at"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid7
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    code_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0"), default=0
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
     )
 
 

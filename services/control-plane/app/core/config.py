@@ -41,6 +41,58 @@ class Settings(BaseSettings):
     dsn_scheme: str = "https"
     retention_days_max: int = 90
 
+    smtp_host: str = Field(
+        default="localhost",
+        validation_alias=AliasChoices("control_plane_smtp_host", "smtp_host"),
+        description="SMTP server host",
+    )
+    smtp_port: int = Field(
+        default=1025,
+        validation_alias=AliasChoices("control_plane_smtp_port", "smtp_port"),
+        description="SMTP server port",
+    )
+    smtp_from: str = Field(
+        default="noreply@faultline.dev",
+        validation_alias=AliasChoices("control_plane_smtp_from", "smtp_from"),
+        description="From address for outgoing emails",
+    )
+    otp_hmac_secret: str = Field(
+        default="dev-otp-hmac-secret-change-in-prod",
+        validation_alias=AliasChoices(
+            "control_plane_otp_hmac_secret", "otp_hmac_secret"
+        ),
+        description="Secret key for HMAC-SHA256 hashing of verification codes",
+    )
+    otp_ttl_seconds: int = Field(
+        default=600,
+        validation_alias=AliasChoices(
+            "control_plane_otp_ttl_seconds", "otp_ttl_seconds"
+        ),
+        description="Time-to-live for email verification codes in seconds",
+    )
+    otp_max_attempts: int = Field(
+        default=5,
+        validation_alias=AliasChoices(
+            "control_plane_otp_max_attempts", "otp_max_attempts"
+        ),
+        description="Maximum failed verification attempts allowed before code invalidation",
+    )
+    otp_resend_cooldown_seconds: int = Field(
+        default=60,
+        validation_alias=AliasChoices(
+            "control_plane_otp_resend_cooldown_seconds",
+            "otp_resend_cooldown_seconds",
+        ),
+        description="Cooldown period in seconds before requesting a new code",
+    )
+    otp_resend_hourly_cap: int = Field(
+        default=5,
+        validation_alias=AliasChoices(
+            "control_plane_otp_resend_hourly_cap", "otp_resend_hourly_cap"
+        ),
+        description="Maximum number of verification codes that can be requested per hour",
+    )
+
     internal_service_secret: str = Field(
         ...,
         validation_alias=AliasChoices(
