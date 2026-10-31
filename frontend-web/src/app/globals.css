@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --canvas: #F8FAFC;
+    --card: #FFFFFF;
+    --card-foreground: #0F172A;
+    --border: #E2E8F0;
+    --border-hover: #CBD5E1;
+
+    --primary: #3B82F6;
+    --primary-hover: #1D4ED8;
+    --primary-tint: #EFF6FF;
+    --primary-subdued: #DBEAFE;
+    --primary-foreground: #FFFFFF;
+
+    --error: #EF4444;
+    --error-foreground: #EF4444;
+    --error-container: #FEE2E2;
+
+    --destructive: #EF4444;
+    --destructive-foreground: #FFFFFF;
+    --destructive-container: #FEE2E2;
+
+    --warning: #F59E0B;
+    --warning-foreground: #B45309;
+    --warning-container: #FEF3C7;
+
+    --success: #10B981;
+    --success-foreground: #065F46;
+    --success-container: #D1FAE5;
+
+    --info: #06B6D4;
+    --info-foreground: #06B6D4;
+    --info-container: #CFFAFE;
+
+    --ai: #8B5CF6;
+    --ai-foreground: #6D28D9;
+    --ai-container: #EDE9FE;
+
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+
+    --muted: #F1F5F9;
+    --ring: #3B82F6;
+  }
+
+  .dark {
+    --canvas: #0B0F19;
+    --card: #111827;
+    --card-foreground: #F8FAFC;
+    --border: #1F2937;
+    --border-hover: #374151;
+
+    --primary: #3B82F6;
+    --primary-hover: #2563EB;
+    --primary-tint: #1E293B;
+    --primary-subdued: #1D283A;
+    --primary-foreground: #FFFFFF;
+
+    --error: #F87171;
+    --error-foreground: #FCA5A5;
+    --error-container: #450A0A;
+
+    --destructive: #F87171;
+    --destructive-foreground: #FFFFFF;
+    --destructive-container: #450A0A;
+
+    --warning: #FBBF24;
+    --warning-foreground: #FDE68A;
+    --warning-container: #451A03;
+
+    --success: #34D399;
+    --success-foreground: #A7F3D0;
+    --success-container: #064E3B;
+
+    --info: #38BDF8;
+    --info-foreground: #BAE6FD;
+    --info-container: #082F49;
+
+    --ai: #A78BFA;
+    --ai-foreground: #DDD6FE;
+    --ai-container: #2E1065;
+
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+
+    --muted: #1E293B;
+    --ring: #3B82F6;
+  }
+
+  [data-theme="admin"] {
+    /* Empty override block reserved for future admin side */
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--text-primary);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Monospace tabular numbers across metric and table values */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
