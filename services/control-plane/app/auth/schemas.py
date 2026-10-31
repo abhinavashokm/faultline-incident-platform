@@ -114,3 +114,44 @@ class CurrentUserResponse(BaseModel):
     created_at: datetime
     workspace: WorkspaceWithRole | None = None
     memberships: list[MembershipResponse] = Field(default_factory=list)
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+    @field_validator("code", mode="before")
+    @classmethod
+    def strip_code(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+
+class VerifyEmailResponse(BaseModel):
+    message: str = "Email verified"
+    email_verified_at: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
+
+class ResendVerificationResponse(BaseModel):
+    message: str = (
+        "If the account exists and is not yet verified, a new code has been sent."
+    )

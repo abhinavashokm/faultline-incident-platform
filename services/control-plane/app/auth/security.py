@@ -8,6 +8,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 
 from app.core.config import settings
+from app.core.security import generate_otp, hash_otp, verify_otp
 
 
 class AuthError(Exception):
@@ -24,6 +25,34 @@ class InvalidCredentials(AuthError):
 
 class InvalidRefreshToken(AuthError):
     """Raised when a refresh token is invalid, expired, revoked, or user inactive."""
+
+
+class EmailNotVerified(AuthError):
+    """Raised when an unverified user attempts to log in."""
+
+
+class InvalidVerificationCode(AuthError):
+    """Raised when a verification code is unknown, expired, or invalid."""
+
+
+class TooManyVerificationAttempts(AuthError):
+    """Raised when the maximum number of failed verification attempts is exceeded."""
+
+
+class VerificationCooldown(AuthError):
+    """Raised when resending verification before the cooldown period expires."""
+
+    def __init__(self, message: str, retry_after: int) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class VerificationHourlyCapExceeded(AuthError):
+    """Raised when resending verification exceeds the hourly request cap."""
+
+    def __init__(self, message: str, retry_after: int) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 password_hasher = PasswordHasher()

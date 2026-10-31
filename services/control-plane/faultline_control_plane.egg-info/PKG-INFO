@@ -11,6 +11,7 @@ Requires-Dist: pydantic-settings>=2.4
 Requires-Dist: argon2-cffi
 Requires-Dist: pyjwt[crypto]
 Requires-Dist: pydantic[email]
+Requires-Dist: aiosmtplib
 Provides-Extra: dev
 Requires-Dist: pytest>=8; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.23; extra == "dev"

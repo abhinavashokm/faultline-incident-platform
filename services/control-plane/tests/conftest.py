@@ -27,6 +27,7 @@ from app.workspaces import models as _workspaces_models  # noqa: F401
 from app.api_main import app
 from app.core.config import _read_key_file, settings
 from app.core.db import Base, get_session
+from app.core.integrations.email import EmailSender, get_email_sender
 
 TEST_DATABASE_URL = os.getenv(
     "CONTROL_PLANE_TEST_DATABASE_URL",
@@ -80,7 +81,7 @@ async def truncate_tables(test_engine: AsyncEngine) -> AsyncIterator[None]:
     async with test_engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE TABLE control.refresh_tokens, control.refresh_sessions, "
+                "TRUNCATE TABLE control.email_verification_codes, control.refresh_tokens, control.refresh_sessions, "
                 "control.project_settings, control.project_api_keys, control.projects, "
                 "control.workspace_members, control.workspaces, control.users CASCADE"
             )
@@ -89,11 +90,32 @@ async def truncate_tables(test_engine: AsyncEngine) -> AsyncIterator[None]:
     async with test_engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE TABLE control.refresh_tokens, control.refresh_sessions, "
+                "TRUNCATE TABLE control.email_verification_codes, control.refresh_tokens, control.refresh_sessions, "
                 "control.project_settings, control.project_api_keys, control.projects, "
                 "control.workspace_members, control.workspaces, control.users CASCADE"
             )
         )
+
+
+class FakeEmailSender:
+    def __init__(self) -> None:
+        self.sent_emails: list[dict[str, object]] = []
+
+    async def send_verification_code(
+        self, to_email: str, code: str, expires_in_minutes: int = 10
+    ) -> None:
+        self.sent_emails.append(
+            {
+                "to_email": to_email,
+                "code": code,
+                "expires_in_minutes": expires_in_minutes,
+            }
+        )
+
+
+@pytest.fixture
+def fake_email_sender() -> FakeEmailSender:
+    return FakeEmailSender()
 
 
 @pytest.fixture
@@ -105,7 +127,10 @@ async def db_session(test_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 
 
 @pytest.fixture
-async def client(test_engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
+async def client(
+    test_engine: AsyncEngine,
+    fake_email_sender: FakeEmailSender,
+) -> AsyncIterator[AsyncClient]:
     """Provide an AsyncClient configured with test database session overrides."""
     session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
 
@@ -114,7 +139,9 @@ async def client(test_engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
             yield session
 
     app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_email_sender] = lambda: fake_email_sender
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
