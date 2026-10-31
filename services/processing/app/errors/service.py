@@ -4,9 +4,18 @@ import re
 import uuid
 from typing import Any
 
+from uuid import UUID
+
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
+from app.errors.cursor import (
+    decode_event_cursor,
+    decode_issue_cursor,
+    encode_event_cursor,
+    encode_issue_cursor,
+)
 from app.errors.fingerprint import (
     FINGERPRINT_VERSION,
     compute_fingerprint,
@@ -14,7 +23,18 @@ from app.errors.fingerprint import (
     derive_title,
 )
 from app.errors.repository import ErrorsRepository
-from app.errors.schemas import ErrorEventPayload, EventEnvelope, ProcessedEventResult
+from app.errors.schemas import (
+    ErrorEventPayload,
+    EventDetail,
+    EventEnvelope,
+    EventListItem,
+    IssueDetail,
+    IssueListItem,
+    PaginatedResponse,
+    PaginationMeta,
+    ProcessedEventResult,
+    UpdateIssueStatusRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -171,3 +191,221 @@ class ErrorsService:
                     is_new=is_new,
                     inserted=inserted,
                 )
+
+
+class ErrorsHttpService:
+    """Service layer for HTTP API queries and issue status updates."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.repo = ErrorsRepository(session)
+
+    async def list_issues(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        status_filter: str | None,
+        limit: int,
+        cursor_str: str | None,
+    ) -> PaginatedResponse[IssueListItem]:
+        cursor = decode_issue_cursor(cursor_str) if cursor_str else None
+        rows = await self.repo.list_issues(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            status=status_filter,
+            limit=limit,
+            cursor=cursor,
+        )
+
+        has_more = len(rows) > limit
+        if has_more:
+            items_data = rows[:limit]
+            last_item = items_data[-1]
+            next_cursor = encode_issue_cursor(last_item["last_seen"], last_item["id"])
+        else:
+            items_data = rows
+            next_cursor = None
+
+        items = [IssueListItem.model_validate(r) for r in items_data]
+        return PaginatedResponse[IssueListItem](
+            items=items,
+            meta=PaginationMeta(
+                limit=limit,
+                has_more=has_more,
+                next_cursor=next_cursor,
+            ),
+        )
+
+    async def get_issue_detail(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        issue_id: UUID,
+    ) -> IssueDetail:
+        issue = await self.repo.get_issue_detail(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            issue_id=issue_id,
+        )
+        if issue is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The requested resource was not found",
+            )
+        return IssueDetail(
+            id=issue.id,
+            title=issue.title,
+            status=issue.status,
+            level=issue.level,
+            exception_type=issue.exception_type,
+            culprit=issue.culprit,
+            occurrence_count=issue.occurrence_count,
+            first_seen=issue.first_seen_at,
+            last_seen=issue.last_seen_at,
+            first_release=issue.first_release,
+            last_release=issue.last_release,
+            affected_users_count=issue.affected_users_count,
+            fingerprint=issue.fingerprint,
+            fingerprint_version=issue.fingerprint_version,
+            resolved_at=issue.resolved_at,
+            resolved_in_release=issue.resolved_in_release,
+            created_at=issue.created_at,
+            updated_at=issue.updated_at,
+        )
+
+    async def list_issue_events(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        issue_id: UUID,
+        limit: int,
+        cursor_str: str | None,
+    ) -> PaginatedResponse[EventListItem]:
+        issue = await self.repo.get_issue_detail(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            issue_id=issue_id,
+        )
+        if issue is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The requested resource was not found",
+            )
+
+        cursor = decode_event_cursor(cursor_str) if cursor_str else None
+        rows = await self.repo.list_events(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            issue_id=issue_id,
+            limit=limit,
+            cursor=cursor,
+        )
+
+        has_more = len(rows) > limit
+        if has_more:
+            items_data = rows[:limit]
+            last_item = items_data[-1]
+            next_cursor = encode_event_cursor(last_item["occurred_at"], last_item["id"])
+        else:
+            items_data = rows
+            next_cursor = None
+
+        items = [EventListItem.model_validate(r) for r in items_data]
+        return PaginatedResponse[EventListItem](
+            items=items,
+            meta=PaginationMeta(
+                limit=limit,
+                has_more=has_more,
+                next_cursor=next_cursor,
+            ),
+        )
+
+    async def get_event_detail(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        issue_id: UUID,
+        event_id: UUID,
+    ) -> EventDetail:
+        event = await self.repo.get_event_detail(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            issue_id=issue_id,
+            event_id=event_id,
+        )
+        if event is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The requested resource was not found",
+            )
+        return EventDetail(
+            id=event.id,
+            issue_id=event.issue_id,
+            occurred_at=event.occurred_at,
+            received_at=event.received_at,
+            level=event.level,
+            exception_type=event.exception_type,
+            message=event.message,
+            environment=event.environment,
+            release=event.release,
+            event_type=event.event_type,
+            fingerprint=event.fingerprint,
+            stack_frames=event.stack_frames,
+            service=event.service,
+            route_template=event.route_template,
+            http_method=event.http_method,
+            status_code=event.status_code,
+            user_hash=event.user_hash,
+            context=event.context,
+        )
+
+    async def update_issue_status(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        issue_id: UUID,
+        body: UpdateIssueStatusRequest,
+        user_id: UUID,
+    ) -> IssueDetail:
+        issue = await self.repo.update_issue_status(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            issue_id=issue_id,
+            new_status=body.status,
+            resolved_in_release=body.resolved_in_release,
+            user_id=user_id,
+        )
+        if issue is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="The requested resource was not found",
+            )
+
+        await self.session.commit()
+        logger.info(
+            "Issue status updated: issue_id=%s status=%s user_id=%s",
+            issue_id,
+            body.status,
+            user_id,
+        )
+
+        return IssueDetail(
+            id=issue.id,
+            title=issue.title,
+            status=issue.status,
+            level=issue.level,
+            exception_type=issue.exception_type,
+            culprit=issue.culprit,
+            occurrence_count=issue.occurrence_count,
+            first_seen=issue.first_seen_at,
+            last_seen=issue.last_seen_at,
+            first_release=issue.first_release,
+            last_release=issue.last_release,
+            affected_users_count=issue.affected_users_count,
+            fingerprint=issue.fingerprint,
+            fingerprint_version=issue.fingerprint_version,
+            resolved_at=issue.resolved_at,
+            resolved_in_release=issue.resolved_in_release,
+            created_at=issue.created_at,
+            updated_at=issue.updated_at,
+        )
