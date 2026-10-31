@@ -2,6 +2,9 @@ import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+# Set default test secret before settings are loaded
+os.environ.setdefault("CONTROL_PLANE_INTERNAL_SERVICE_SECRET", "test-internal-secret")
+
 import pytest
 import pytest_asyncio
 from cryptography.hazmat.primitives import serialization

@@ -1,6 +1,10 @@
 import asyncio
+import os
 import uuid
 from typing import AsyncIterator
+
+# Provide test default for internal service token before app/settings load
+os.environ.setdefault("CONTROL_PLANE_SERVICE_TOKEN", "test-internal-token")
 
 import pytest
 import pytest_asyncio

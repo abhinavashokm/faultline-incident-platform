@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,7 +47,13 @@ class Settings(BaseSettings):
         description="Base URL for Control Plane internal service endpoints",
     )
     control_plane_service_token: str = Field(
-        default="",
+        ...,
+        validation_alias=AliasChoices(
+            "control_plane_service_token",
+            "control_plane_internal_service_secret",
+            "internal_service_secret",
+            "service_token",
+        ),
         description="Service-to-service secret token for internal API authentication",
     )
     control_plane_timeout_seconds: float = Field(

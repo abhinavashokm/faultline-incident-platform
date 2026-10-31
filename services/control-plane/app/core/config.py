@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     retention_days_max: int = 90
 
     internal_service_secret: str = Field(
-        default="",
+        ...,
         validation_alias=AliasChoices(
             "control_plane_internal_service_secret",
             "control_plane_service_token",

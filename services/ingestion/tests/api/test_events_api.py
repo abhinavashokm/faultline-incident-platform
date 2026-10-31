@@ -338,3 +338,74 @@ async def test_header_fallbacks(
     )
     assert resp2.status_code == 202
 
+
+@pytest.mark.asyncio
+async def test_control_plane_error_mappings_through_api(fake_kafka, fake_limiter):
+    import asyncio
+    from unittest.mock import AsyncMock
+    import httpx
+    from httpx import ASGITransport
+    from app.adapters.key_resolver import CachedHttpProjectKeyResolver
+    from app.dependencies import (
+        get_concurrency_semaphore,
+        get_kafka_producer,
+        get_key_resolver,
+        get_rate_limiter,
+    )
+    from app.main import create_app
+
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = None  # Cold cache
+    mock_http = AsyncMock()
+
+    key_resolver = CachedHttpProjectKeyResolver(
+        redis_client=mock_redis,
+        http_client=mock_http,
+        control_plane_url="http://control-plane:8000",
+        service_token="test-secret",
+    )
+
+    app = create_app()
+    app.dependency_overrides[get_kafka_producer] = lambda: fake_kafka
+    app.dependency_overrides[get_rate_limiter] = lambda: fake_limiter
+    app.dependency_overrides[get_key_resolver] = lambda: key_resolver
+    app.dependency_overrides[get_concurrency_semaphore] = lambda: asyncio.Semaphore(100)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        payload = {
+            "event_id": str(uuid.uuid4()),
+            "occurred_at": datetime.now(timezone.utc).isoformat(),
+            "exception_type": "MappingTestError",
+        }
+
+        # 1. Control Plane 404 -> Ingestion 401
+        mock_http.get.return_value = httpx.Response(404, json={"detail": "Project key not found"})
+        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-404"})
+        assert resp.status_code == 401
+        assert "Invalid or revoked project key" in resp.json()["detail"]
+
+        # 2. Control Plane 401 -> Ingestion 503 + Retry-After
+        mock_http.get.return_value = httpx.Response(401, json={"detail": "Missing or invalid service token"})
+        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-401"})
+        assert resp.status_code == 503
+        assert resp.headers.get("Retry-After") == "5"
+
+        # 3. Control Plane 403 -> Ingestion 503 + Retry-After
+        mock_http.get.return_value = httpx.Response(403, json={"detail": "Forbidden"})
+        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-403"})
+        assert resp.status_code == 503
+        assert resp.headers.get("Retry-After") == "5"
+
+        # 4. Control Plane 500 -> Ingestion 503 + Retry-After
+        mock_http.get.return_value = httpx.Response(500, text="Internal Server Error")
+        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-500"})
+        assert resp.status_code == 503
+        assert resp.headers.get("Retry-After") == "5"
+
+        # 5. Connection Error -> Ingestion 503 + Retry-After
+        mock_http.get.side_effect = httpx.ConnectError("Failed to connect")
+        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-conn"})
+        assert resp.status_code == 503
+        assert resp.headers.get("Retry-After") == "5"
+

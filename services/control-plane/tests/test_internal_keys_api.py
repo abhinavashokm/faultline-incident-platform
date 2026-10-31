@@ -311,6 +311,19 @@ async def test_resolve_key_unconfigured_service_secret(
     assert "Missing or invalid service token" in resp.json()["detail"]
 
 
+def test_settings_fails_when_secret_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies that Settings refuses to initialize when no internal secret is provided."""
+    from pydantic import ValidationError
+    from app.core.config import Settings
+
+    monkeypatch.delenv("CONTROL_PLANE_INTERNAL_SERVICE_SECRET", raising=False)
+    monkeypatch.delenv("CONTROL_PLANE_SERVICE_TOKEN", raising=False)
+    monkeypatch.delenv("INTERNAL_SERVICE_SECRET", raising=False)
+    monkeypatch.delenv("SERVICE_TOKEN", raising=False)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
 @pytest.mark.asyncio
 async def test_resolve_key_rejects_user_jwt(
     client: AsyncClient, db_session: AsyncSession

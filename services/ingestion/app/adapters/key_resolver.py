@@ -123,11 +123,9 @@ class CachedHttpProjectKeyResolver:
 
         # 2. Call Control Plane internal endpoint on cache miss
         url = f"{self.control_plane_url}/api/v1/internal/project-keys/{public_key}"
-        headers = {}
-        if self.service_token:
-            headers["X-Service-Token"] = self.service_token
+        headers = {"X-Service-Token": self.service_token or ""}
 
-        logger.debug("Resolving key=%s via Control Plane at %s", key_masked, url)
+        logger.debug("Resolving key=%s via Control Plane internal endpoint", key_masked)
 
         try:
             response = await self.http_client.get(
@@ -174,14 +172,24 @@ class CachedHttpProjectKeyResolver:
                 logger.error("Control plane response parsing error for key=%s: %s", key_masked, exc)
                 raise KeyResolverUnavailableError("Invalid response from key resolution service") from exc
 
-        elif response.status_code in (404, 401, 403):
-            # Unknown or invalid key: negative-cache it
+        elif response.status_code == 404:
+            # Unknown, inactive, or revoked key: negative-cache it
             await self._write_cache(
                 public_key,
                 {"status": "not_found"},
                 self.negative_cache_ttl,
             )
             raise InvalidKeyError("Invalid project key")
+
+        elif response.status_code in (401, 403):
+            logger.error(
+                "Control Plane authentication failed with status=%d for key=%s; verify service credential configuration",
+                response.status_code,
+                key_masked,
+            )
+            raise KeyResolverUnavailableError(
+                "Key resolution service authentication misconfigured"
+            )
 
         else:
             logger.error(
