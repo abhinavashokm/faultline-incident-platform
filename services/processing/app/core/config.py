@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     database_url: str = Field(
         default="postgresql+asyncpg://faultline:faultline@localhost:5432/processing",
-        validation_alias=AliasChoices("database_url", "db_url"),
+        validation_alias=AliasChoices("processing_database_url", "database_url", "db_url"),
         description="Async PostgreSQL database URL",
     )
     database_schema: str = Field(
