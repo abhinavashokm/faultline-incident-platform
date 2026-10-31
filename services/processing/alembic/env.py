@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.db import Base
 from app.errors import models  # noqa: F401  (registers the models on Base.metadata)
 
-SCHEMA = "processing"
+SCHEMA = settings.database_schema
 
 config = context.config
 if config.config_file_name is not None:
