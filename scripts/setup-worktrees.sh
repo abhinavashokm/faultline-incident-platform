@@ -10,6 +10,7 @@ WORKTREES=(
 SHARED_ITEMS=(
     ".local"
     ".env"
+    "services/control-plane/keys"
 )
 
 for WORKTREE in "${WORKTREES[@]}"; do
