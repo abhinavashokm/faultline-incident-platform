@@ -129,21 +129,22 @@ class IngestionService:
             ) from exc
 
         # 2. Rate limiting check (per project)
-        allowed, retry_after = await self.rate_limiter.is_allowed(resolved.project_id)
-        if not allowed:
-            log_event_rejected(
-                logger,
-                reason="rate_limit_exceeded",
-                status_code=429,
-                key_prefix=key_prefix,
-                details=f"project_id={resolved.project_id} retry_after={retry_after}",
-            )
-            raise RateLimitExceededError(
-                retry_after=retry_after,
-                detail=f"Rate limit exceeded. Retry after {retry_after} seconds.",
-            )
+        # allowed, retry_after = await self.rate_limiter.is_allowed(resolved.project_id)
+        # if not allowed:
+        #     log_event_rejected(
+        #         logger,
+        #         reason="rate_limit_exceeded",
+        #         status_code=429,
+        #         key_prefix=key_prefix,
+        #         details=f"project_id={resolved.project_id} retry_after={retry_after}",
+        #     )
+        #     raise RateLimitExceededError(
+        #         retry_after=retry_after,
+        #         detail=f"Rate limit exceeded. Retry after {retry_after} seconds.",
+        #     )
 
         # 3. Bounded in-flight concurrency (backpressure)
+        
         # Try to acquire semaphore without blocking indefinitely
         try:
             acquired = self.semaphore.locked() is False
