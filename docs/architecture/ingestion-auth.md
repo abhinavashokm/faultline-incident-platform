@@ -4,7 +4,7 @@
 
 ## Overview
 
-- The Python SDK authenticates to the **Ingestion service** with a **project API key** in the project DSN, for example `https://<project_api_key>@<host>/<project_id>`.
+- The Python SDK authenticates to the **Ingestion service** with a **project API key** in the project DSN, for example `https://<project_api_key>@<host>`. The DSN carries only the key and the ingestion host. The project is identified by the validated key, not by an ID in the DSN.
 - The key identifies one project and grants **ingestion only**. It never authorizes dashboard access, administration, releases, or remediation.
 - The **Control Plane** owns keys. **Ingestion** verifies them by asking the Control Plane and caching the result in Redis.
 
@@ -32,7 +32,7 @@ sequenceDiagram
 
   SDK->>ING: POST /api/v1/events
   ING->>ING: size limit, schema validation
-  ING->>R: lookup ingestion:key:<project_api_key_hash>
+  ING->>R: lookup ingestion:key:<hash>
   opt cache miss
     ING->>CP: validate key hash
     CP-->>ING: project_id, workspace_id, active or revoked
@@ -75,7 +75,7 @@ Redis is shared infrastructure, not shared data. Ingestion owns these keys and n
 
 | Key | Purpose | TTL |
 |---|---|---|
-| `ingestion:key:<project_api_key_hash>` | Cached validation result | 30 to 60s |
+| `ingestion:key:<key_hash>` | Cached validation result | 30 to 60s |
 | `ingestion:ratelimit:<project_id>` | Rate limit counter | Per window |
 
 ## SDK behavior
