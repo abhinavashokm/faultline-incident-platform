@@ -16,7 +16,7 @@ def get_project_key(
     x_project_key: Annotated[str | None, Header(alias="X-Project-Key")] = None,
     authorization: Annotated[str | None, Header()] = None,
 ) -> str | None:
-    """Extract project ingest public key from headers.
+    """Extract project API key from headers.
     Prefers X-Faultline-Key, with fallback to X-Project-Key or Bearer token.
     """
     if x_faultline_key and x_faultline_key.strip():

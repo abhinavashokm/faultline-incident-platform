@@ -50,7 +50,7 @@ def test_project_id() -> uuid.UUID:
 
 
 @pytest.fixture
-def test_public_key(fake_resolver, test_project_id, test_workspace_id) -> str:
+def test_project_api_key(fake_resolver, test_project_id, test_workspace_id) -> str:
     key = "fl_pub_test12345678"
     fake_resolver.add_key(key, project_id=test_project_id, workspace_id=test_workspace_id)
     return key

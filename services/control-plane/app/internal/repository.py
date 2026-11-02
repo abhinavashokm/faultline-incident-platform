@@ -14,14 +14,14 @@ class InternalKeyRepository:
         self.session = session
 
     async def get_key_with_project_and_workspace(
-        self, public_key: str
+        self, project_api_key: str
     ) -> tuple[ProjectApiKey, Project, Workspace] | None:
         query = (
             select(ProjectApiKey, Project, Workspace)
             .join(Project, ProjectApiKey.project_id == Project.id)
             .join(Workspace, Project.workspace_id == Workspace.id)
             .where(
-                ProjectApiKey.public_key == public_key,
+                ProjectApiKey.public_key == project_api_key,
                 ProjectApiKey.key_type == "ingest",
             )
         )

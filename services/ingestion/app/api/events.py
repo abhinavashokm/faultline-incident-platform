@@ -16,8 +16,8 @@ router = APIRouter()
 )
 async def ingest_error_event(
     payload: ErrorEventIngestRequest,
-    public_key: Annotated[str | None, Depends(get_project_key)],
+    project_api_key: Annotated[str | None, Depends(get_project_key)],
     service: Annotated[IngestionService, Depends(get_ingestion_service)],
 ) -> IngestResponse:
-    return await service.ingest_error_event(payload, public_key=public_key)
+    return await service.ingest_error_event(payload, project_api_key=project_api_key)
 

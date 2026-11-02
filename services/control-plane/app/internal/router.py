@@ -23,7 +23,7 @@ async def resolve_project_key(
     public_key: str,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ProjectKeyResolutionResponse:
-    """Internal endpoint for Ingestion service to resolve an ingest public key."""
+    """Internal endpoint for Ingestion service to resolve an ingest project API key."""
     service = InternalKeyService(session)
     result = await service.resolve_ingest_key(public_key)
     if result is None:

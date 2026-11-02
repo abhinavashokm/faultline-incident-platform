@@ -90,12 +90,12 @@ class IngestionService:
     async def ingest_error_event(
         self,
         request: ErrorEventIngestRequest,
-        public_key: str | None,
+        project_api_key: str | None,
     ) -> IngestResponse:
-        key_prefix = mask_key(public_key)
+        key_prefix = mask_key(project_api_key)
 
-        # 1. Authenticate via public key
-        if not public_key or not public_key.strip():
+        # 1. Authenticate via project API key
+        if not project_api_key or not project_api_key.strip():
             log_event_rejected(
                 logger,
                 reason="missing_api_key",
@@ -105,7 +105,7 @@ class IngestionService:
             raise AuthenticationError("Missing project key header")
 
         try:
-            resolved: ResolvedKey = await self.key_resolver.resolve(public_key)
+            resolved: ResolvedKey = await self.key_resolver.resolve(project_api_key)
         except InvalidKeyError as exc:
             log_event_rejected(
                 logger,

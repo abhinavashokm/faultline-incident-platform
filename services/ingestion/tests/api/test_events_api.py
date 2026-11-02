@@ -13,7 +13,7 @@ from app.adapters.redis_limiter import FakeRateLimiter
 async def test_ingest_event_happy_path_202(
     client: AsyncClient,
     fake_kafka: FakeKafkaProducer,
-    test_public_key: str,
+    test_project_api_key: str,
     test_project_id: uuid.UUID,
     test_workspace_id: uuid.UUID,
 ):
@@ -37,7 +37,7 @@ async def test_ingest_event_happy_path_202(
     response = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"X-Faultline-Key": test_public_key},
+        headers={"X-Faultline-Key": test_project_api_key},
     )
 
     assert response.status_code == 202
@@ -66,7 +66,7 @@ async def test_ingest_event_happy_path_202(
 async def test_client_supplied_project_id_is_ignored(
     client: AsyncClient,
     fake_kafka: FakeKafkaProducer,
-    test_public_key: str,
+    test_project_api_key: str,
     test_project_id: uuid.UUID,
     test_workspace_id: uuid.UUID,
 ):
@@ -86,7 +86,7 @@ async def test_client_supplied_project_id_is_ignored(
     response = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"X-Faultline-Key": test_public_key},
+        headers={"X-Faultline-Key": test_project_api_key},
     )
 
     assert response.status_code == 202
@@ -154,7 +154,7 @@ async def test_auth_failure_revoked_key(
 @pytest.mark.asyncio
 async def test_schema_validation_error_422(
     client: AsyncClient,
-    test_public_key: str,
+    test_project_api_key: str,
 ):
     # Missing required field occurred_at
     payload = {
@@ -165,7 +165,7 @@ async def test_schema_validation_error_422(
     response = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"X-Faultline-Key": test_public_key},
+        headers={"X-Faultline-Key": test_project_api_key},
     )
     assert response.status_code == 422
     assert "detail" in response.json()
@@ -174,7 +174,7 @@ async def test_schema_validation_error_422(
 @pytest.mark.asyncio
 async def test_payload_too_large_413(
     client: AsyncClient,
-    test_public_key: str,
+    test_project_api_key: str,
 ):
     # Request body exceeding 200 KB
     huge_message = "x" * (250 * 1024)
@@ -188,7 +188,7 @@ async def test_payload_too_large_413(
     response = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"X-Faultline-Key": test_public_key},
+        headers={"X-Faultline-Key": test_project_api_key},
     )
     assert response.status_code == 413
     assert "detail" in response.json()
@@ -197,7 +197,7 @@ async def test_payload_too_large_413(
 @pytest.mark.asyncio
 async def test_rate_limit_exceeded_429(
     client: AsyncClient,
-    test_public_key: str,
+    test_project_api_key: str,
     fake_limiter: FakeRateLimiter,
 ):
     fake_limiter.force_block = True
@@ -211,7 +211,7 @@ async def test_rate_limit_exceeded_429(
     response = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"X-Faultline-Key": test_public_key},
+        headers={"X-Faultline-Key": test_project_api_key},
     )
     assert response.status_code == 429
     assert response.headers.get("Retry-After") == "60"
@@ -221,7 +221,7 @@ async def test_rate_limit_exceeded_429(
 @pytest.mark.asyncio
 async def test_kafka_failure_returns_503(
     client: AsyncClient,
-    test_public_key: str,
+    test_project_api_key: str,
     fake_kafka: FakeKafkaProducer,
 ):
     fake_kafka.should_fail = True
@@ -235,7 +235,7 @@ async def test_kafka_failure_returns_503(
     response = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"X-Faultline-Key": test_public_key},
+        headers={"X-Faultline-Key": test_project_api_key},
     )
     assert response.status_code == 503
     assert "Retry-After" in response.headers
@@ -246,7 +246,7 @@ async def test_kafka_failure_returns_503(
 async def test_resolver_down_and_cold_cache_returns_503(
     client: AsyncClient,
     fake_resolver: FakeProjectKeyResolver,
-    test_public_key: str,
+    test_project_api_key: str,
 ):
     fake_resolver.simulate_unreachable = True
 
@@ -259,7 +259,7 @@ async def test_resolver_down_and_cold_cache_returns_503(
     response = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"X-Faultline-Key": test_public_key},
+        headers={"X-Faultline-Key": test_project_api_key},
     )
     assert response.status_code == 503
     assert "Retry-After" in response.headers
@@ -271,7 +271,7 @@ async def test_backpressure_saturation_returns_503(
     fake_kafka: FakeKafkaProducer,
     fake_limiter: FakeRateLimiter,
     fake_resolver: FakeProjectKeyResolver,
-    test_public_key: str,
+    test_project_api_key: str,
 ):
     import asyncio
     from httpx import ASGITransport
@@ -303,7 +303,7 @@ async def test_backpressure_saturation_returns_503(
         response = await ac.post(
             "/api/v1/events",
             json=payload,
-            headers={"X-Faultline-Key": test_public_key},
+            headers={"X-Faultline-Key": test_project_api_key},
         )
         assert response.status_code == 503
         assert "Retry-After" in response.headers
@@ -313,7 +313,7 @@ async def test_backpressure_saturation_returns_503(
 @pytest.mark.asyncio
 async def test_header_fallbacks(
     client: AsyncClient,
-    test_public_key: str,
+    test_project_api_key: str,
 ):
     payload = {
         "event_id": str(uuid.uuid4()),
@@ -325,7 +325,7 @@ async def test_header_fallbacks(
     resp1 = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"X-Project-Key": test_public_key},
+        headers={"X-Project-Key": test_project_api_key},
     )
     assert resp1.status_code == 202
 
@@ -334,7 +334,7 @@ async def test_header_fallbacks(
     resp2 = await client.post(
         "/api/v1/events",
         json=payload,
-        headers={"Authorization": f"Bearer {test_public_key}"},
+        headers={"Authorization": f"Bearer {test_project_api_key}"},
     )
     assert resp2.status_code == 202
 

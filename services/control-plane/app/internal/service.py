@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def mask_key(key: str | None) -> str:
-    """Mask a public key for safe logging, displaying at most a short prefix."""
+    """Mask a project API key for safe logging, displaying at most a short prefix."""
     if not key:
         return "<none>"
     if len(key) <= 6:
@@ -27,9 +27,9 @@ class InternalKeyService:
         self.repository = InternalKeyRepository(session)
 
     async def resolve_ingest_key(
-        self, public_key: str
+        self, project_api_key: str
     ) -> ProjectKeyResolutionResponse | None:
-        cleaned_key = public_key.strip()
+        cleaned_key = project_api_key.strip()
         if not cleaned_key:
             return None
 

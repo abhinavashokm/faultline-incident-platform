@@ -179,7 +179,7 @@ async def test_resolve_key_release_type_key_value_passed(
 
     headers = {"X-Service-Token": TEST_INTERNAL_SECRET}
 
-    # Test passing key_prefix as public_key
+    # Test passing key_prefix as project_api_key
     resp_prefix = await client.get(
         f"/api/v1/internal/project-keys/{release_key.key_prefix}",
         headers=headers,
@@ -187,7 +187,7 @@ async def test_resolve_key_release_type_key_value_passed(
     assert resp_prefix.status_code == 404
     assert resp_prefix.json()["detail"] == "Project key not found"
 
-    # Test passing key_hash as public_key
+    # Test passing key_hash as project_api_key
     resp_hash = await client.get(
         f"/api/v1/internal/project-keys/{release_key.key_hash}",
         headers=headers,

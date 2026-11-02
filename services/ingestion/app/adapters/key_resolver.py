@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class InvalidKeyError(Exception):
-    """Raised when public key is invalid, not found, or revoked (401)."""
+    """Raised when project API key is invalid, not found, or revoked (401)."""
 
 
 class KeyResolverUnavailableError(Exception):
@@ -30,12 +30,12 @@ class ResolvedKey:
 
 
 class ProjectKeyResolver(Protocol):
-    async def resolve(self, public_key: str) -> ResolvedKey:
+    async def resolve(self, project_api_key: str) -> ResolvedKey:
         ...
 
 
 class CachedHttpProjectKeyResolver:
-    """Resolves project public keys via Redis cache with fallback to Control Plane internal HTTP endpoint."""
+    """Resolves project API keys via Redis cache with fallback to Control Plane internal HTTP endpoint."""
 
     def __init__(
         self,
@@ -64,12 +64,12 @@ class CachedHttpProjectKeyResolver:
             timeout_seconds if timeout_seconds is not None else settings.control_plane_timeout_seconds
         )
 
-    def _cache_key(self, public_key: str) -> str:
-        return f"cache:project_key:{public_key}"
+    def _cache_key(self, project_api_key: str) -> str:
+        return f"cache:project_key:{project_api_key}"
 
-    async def _check_cache(self, public_key: str) -> ResolvedKey | None:
+    async def _check_cache(self, project_api_key: str) -> ResolvedKey | None:
         try:
-            val = await self.redis.get(self._cache_key(public_key))
+            val = await self.redis.get(self._cache_key(project_api_key))
             if not val:
                 return None
             data = json.loads(val)
@@ -89,40 +89,40 @@ class CachedHttpProjectKeyResolver:
         except (RedisError, ConnectionError, TimeoutError, json.JSONDecodeError, KeyError, ValueError) as exc:
             logger.warning(
                 "Redis key cache lookup failed for key=%s: %s",
-                mask_key(public_key),
+                mask_key(project_api_key),
                 exc,
             )
             return None
         return None
 
-    async def _write_cache(self, public_key: str, data: dict, ttl: int) -> None:
+    async def _write_cache(self, project_api_key: str, data: dict, ttl: int) -> None:
         try:
             await self.redis.set(
-                self._cache_key(public_key),
+                self._cache_key(project_api_key),
                 json.dumps(data),
                 ex=ttl,
             )
         except (RedisError, ConnectionError, TimeoutError) as exc:
             logger.warning(
                 "Redis key cache write failed for key=%s: %s",
-                mask_key(public_key),
+                mask_key(project_api_key),
                 exc,
             )
 
-    async def resolve(self, public_key: str) -> ResolvedKey:
-        if not public_key or not public_key.strip():
-            raise InvalidKeyError("Public key is required")
+    async def resolve(self, project_api_key: str) -> ResolvedKey:
+        if not project_api_key or not project_api_key.strip():
+            raise InvalidKeyError("Project API key is required")
 
-        public_key = public_key.strip()
-        key_masked = mask_key(public_key)
+        project_api_key = project_api_key.strip()
+        key_masked = mask_key(project_api_key)
 
         # 1. Check Redis cache first
-        cached = await self._check_cache(public_key)
+        cached = await self._check_cache(project_api_key)
         if cached is not None:
             return cached
 
         # 2. Call Control Plane internal endpoint on cache miss
-        url = f"{self.control_plane_url}/api/v1/internal/project-keys/{public_key}"
+        url = f"{self.control_plane_url}/api/v1/internal/project-keys/{project_api_key}"
         headers = {"X-Service-Token": self.service_token or ""}
 
         logger.debug("Resolving key=%s via Control Plane internal endpoint", key_masked)
@@ -149,7 +149,7 @@ class CachedHttpProjectKeyResolver:
                 is_revoked = bool(res_data.get("revoked", False))
                 if is_revoked:
                     await self._write_cache(
-                        public_key,
+                        project_api_key,
                         {"status": "revoked"},
                         self.negative_cache_ttl,
                     )
@@ -159,7 +159,7 @@ class CachedHttpProjectKeyResolver:
                 ws_id = UUID(res_data["workspace_id"])
 
                 await self._write_cache(
-                    public_key,
+                    project_api_key,
                     {
                         "status": "valid",
                         "project_id": str(proj_id),
@@ -175,7 +175,7 @@ class CachedHttpProjectKeyResolver:
         elif response.status_code == 404:
             # Unknown, inactive, or revoked key: negative-cache it
             await self._write_cache(
-                public_key,
+                project_api_key,
                 {"status": "not_found"},
                 self.negative_cache_ttl,
             )
@@ -207,21 +207,21 @@ class FakeProjectKeyResolver:
         self.keys: dict[str, ResolvedKey] = {}
         self.simulate_unreachable = False
 
-    def add_key(self, public_key: str, project_id: UUID, workspace_id: UUID, revoked: bool = False) -> None:
-        self.keys[public_key] = ResolvedKey(
+    def add_key(self, project_api_key: str, project_id: UUID, workspace_id: UUID, revoked: bool = False) -> None:
+        self.keys[project_api_key] = ResolvedKey(
             project_id=project_id,
             workspace_id=workspace_id,
             revoked=revoked,
         )
 
-    async def resolve(self, public_key: str) -> ResolvedKey:
+    async def resolve(self, project_api_key: str) -> ResolvedKey:
         if self.simulate_unreachable:
             raise KeyResolverUnavailableError("Simulated Control Plane outage")
 
-        if not public_key or public_key not in self.keys:
+        if not project_api_key or project_api_key not in self.keys:
             raise InvalidKeyError("Invalid project key")
 
-        resolved = self.keys[public_key]
+        resolved = self.keys[project_api_key]
         if resolved.revoked:
             raise InvalidKeyError("Project key is revoked")
         return resolved

@@ -32,7 +32,7 @@ async def test_cached_resolver_cache_hit():
         control_plane_url="http://control-plane:8000",
     )
 
-    resolved = await resolver.resolve("test_public_key")
+    resolved = await resolver.resolve("test_project_api_key")
     assert resolved.project_id == proj_id
     assert resolved.workspace_id == ws_id
     mock_http.get.assert_not_called()
@@ -62,7 +62,7 @@ async def test_cached_resolver_cache_miss_http_success():
         cache_ttl=300,
     )
 
-    resolved = await resolver.resolve("test_public_key")
+    resolved = await resolver.resolve("test_project_api_key")
     assert resolved.project_id == proj_id
     assert resolved.workspace_id == ws_id
 
@@ -289,7 +289,7 @@ async def test_cached_resolver_does_not_log_secret_or_full_key(caplog):
         with pytest.raises(KeyResolverUnavailableError):
             await resolver.resolve(full_key)
 
-    # Check that neither secret nor full public key appears in any captured log message
+    # Check that neither secret nor full project API key appears in any captured log message
     for record in caplog.records:
         assert secret_value not in record.message
         assert full_key not in record.message

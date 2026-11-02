@@ -65,8 +65,8 @@ class ProjectService:
         if member.role not in ("owner", "admin"):
             raise InsufficientPermissions("Insufficient permissions")
 
-    def _build_dsn(self, public_key: str, project_id: uuid.UUID) -> str:
-        return f"{settings.dsn_scheme}://{public_key}@{settings.dsn_host}/{project_id}"
+    def _build_dsn(self, project_api_key: str, project_id: uuid.UUID) -> str:
+        return f"{settings.dsn_scheme}://{project_api_key}@{settings.dsn_host}/{project_id}"
 
     async def list_projects(
         self, user_id: uuid.UUID, workspace_id: uuid.UUID | None
@@ -82,7 +82,7 @@ class ProjectService:
         payload: ProjectCreateRequest,
     ) -> tuple[Project, str]:
         project_id = uuid.uuid4()
-        public_key = secrets.token_hex(16)
+        project_api_key = secrets.token_hex(16)
         now = datetime.now(timezone.utc)
 
         try:
@@ -123,7 +123,7 @@ class ProjectService:
                     workspace_id=workspace_id,
                     project_id=project_id,
                     key_type="ingest",
-                    public_key=public_key,
+                    public_key=project_api_key,
                     key_hash=None,
                     key_prefix=None,
                     created_by=user_id,
@@ -136,7 +136,7 @@ class ProjectService:
                 "A project with this slug already exists in the workspace"
             ) from exc
 
-        dsn = self._build_dsn(public_key, project_id)
+        dsn = self._build_dsn(project_api_key, project_id)
         return project, dsn
 
     async def get_project(
@@ -279,7 +279,7 @@ class ProjectService:
         project_id: uuid.UUID,
     ) -> tuple[ProjectApiKey, str]:
         now = datetime.now(timezone.utc)
-        new_public_key = secrets.token_hex(16)
+        new_project_api_key = secrets.token_hex(16)
 
         async with self.session.begin():
             member = await self._ensure_membership(user_id, workspace_id)
@@ -301,7 +301,7 @@ class ProjectService:
                 workspace_id=workspace_id,
                 project_id=project_id,
                 key_type="ingest",
-                public_key=new_public_key,
+                public_key=new_project_api_key,
                 key_hash=None,
                 key_prefix=None,
                 created_by=user_id,
@@ -309,9 +309,6 @@ class ProjectService:
             )
             await self.repository.create_api_key(new_key)
 
-        dsn = self._build_dsn(new_public_key, project_id)
-        return new_key, dsn
-
-        dsn = self._build_dsn(new_public_key, project_id)
+        dsn = self._build_dsn(new_project_api_key, project_id)
         return new_key, dsn
 

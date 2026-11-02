@@ -7,7 +7,7 @@ request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id
 
 
 def mask_key(key: str | None) -> str:
-    """Mask a public key or secret, returning at most a short prefix."""
+    """Mask a project API key or secret, returning at most a short prefix."""
     if not key:
         return "<none>"
     if len(key) <= 6:
