@@ -11,14 +11,16 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /build
 
-# Install shared lib: faultline-auth
+# Copy shared lib: faultline-auth
 COPY libs/faultline-auth /build/libs/faultline-auth
-RUN pip install --prefix=/install /build/libs/faultline-auth
 
-# Install control-plane service (copy pyproject first for layer caching)
+# Copy control-plane service (pyproject first for layer caching)
 COPY services/control-plane/pyproject.toml /build/service/pyproject.toml
 COPY services/control-plane /build/service
-RUN pip install --prefix=/install /build/service
+
+# Install the library and the service in ONE command so pip resolves
+# faultline-auth from the local path instead of PyPI
+RUN pip install --prefix=/install /build/libs/faultline-auth /build/service
 
 # ── Final stage ───────────────────────────────────────────────────────────────
 FROM python:3.12-slim AS final
