@@ -5,9 +5,11 @@ from datetime import datetime, timedelta, timezone
 import jwt
 import pytest
 import pytest_asyncio
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from faultline_auth import AuthConfigurationError, reset_auth_cache
 from app.core.config import settings
 from app.core.db import get_session
 from app.errors.models import Issue
@@ -90,12 +92,13 @@ async def real_auth_client(
     monkeypatch,
 ) -> AsyncIterator[AsyncClient]:
     """Client using the REAL get_principal (no get_principal dependency override)."""
-    monkeypatch.setattr(settings, "auth_provider", "static")
-    monkeypatch.setattr(settings, "auth_issuer", "faultline-control-plane")
-    monkeypatch.setattr(settings, "auth_audience", "faultline")
-    monkeypatch.setattr(settings, "auth_leeway_seconds", 30)
-    monkeypatch.setattr(settings, "auth_public_key_path", rsa_keys["pub_key_path"])
-    monkeypatch.setattr(settings, "auth_jwt_key_id", rsa_keys["kid"])
+    monkeypatch.setenv("AUTH_PROVIDER", "static")
+    monkeypatch.setenv("AUTH_ISSUER", "faultline-control-plane")
+    monkeypatch.setenv("AUTH_AUDIENCE", "faultline")
+    monkeypatch.setenv("AUTH_LEEWAY_SECONDS", "30")
+    monkeypatch.setenv("AUTH_PUBLIC_KEY_PATH", rsa_keys["pub_key_path"])
+    monkeypatch.setenv("AUTH_JWT_KEY_ID", rsa_keys["kid"])
+    reset_auth_cache()
 
     app = create_app()
 
@@ -109,6 +112,8 @@ async def real_auth_client(
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+    reset_auth_cache()
 
 
 # 1. End-to-end API test with real token verification and tenant isolation
@@ -185,7 +190,8 @@ async def test_e2e_unauthenticated_request_rejected(real_auth_client: AsyncClien
 # 3. Expired token rejected with 401
 @pytest.mark.asyncio
 async def test_e2e_expired_token_rejected(real_auth_client: AsyncClient, rsa_keys, monkeypatch):
-    monkeypatch.setattr(settings, "auth_leeway_seconds", 0)
+    monkeypatch.setenv("AUTH_LEEWAY_SECONDS", "0")
+    reset_auth_cache()
     expired_token = make_token(
         rsa_keys["private_key"],
         workspace_id=uuid.uuid4(),
@@ -243,15 +249,19 @@ async def test_e2e_non_uuid_workspace_id_returns_403(real_auth_client: AsyncClie
     assert res.json()["detail"] == "You do not have permission to access this resource"
 
 
-# 7. App refuses / rejects all requests with 401 when auth is misconfigured
+# 7. App rejects requests with 500 when auth is misconfigured at request time
 @pytest.mark.asyncio
-async def test_e2e_misconfiguration_rejects_requests_with_401(
+async def test_e2e_misconfiguration_rejects_requests_with_500(
     session_factory: async_sessionmaker[AsyncSession],
     rsa_keys,
     monkeypatch,
 ):
-    monkeypatch.setattr(settings, "auth_provider", "static")
-    monkeypatch.setattr(settings, "auth_public_key_path", "/nonexistent/path/pub.pem")
+    monkeypatch.setenv("AUTH_PROVIDER", "static")
+    monkeypatch.setenv("AUTH_ISSUER", "faultline-control-plane")
+    monkeypatch.setenv("AUTH_AUDIENCE", "faultline")
+    monkeypatch.setenv("AUTH_PUBLIC_KEY_PATH", "/nonexistent/path/pub.pem")
+    monkeypatch.setenv("AUTH_JWT_KEY_ID", "key-1")
+    reset_auth_cache()
 
     app = create_app()
 
@@ -268,8 +278,10 @@ async def test_e2e_misconfiguration_rejects_requests_with_401(
             f"/api/v1/projects/{uuid.uuid4()}/issues",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert res.status_code == 401
-        assert res.json()["detail"] == "Missing or invalid credentials"
+        assert res.status_code == 500
+        assert res.json()["detail"] == "Internal server error"
+
+    reset_auth_cache()
 
 
 # 8. /health endpoint is unauthenticated

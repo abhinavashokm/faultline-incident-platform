@@ -17,6 +17,7 @@ dependencies = [
     "pyjwt[crypto]",
     "pydantic[email]",
     "aiosmtplib",
+    "faultline-auth",
 ]
 
 [project.optional-dependencies]

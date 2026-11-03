@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import Principal, get_principal
+from faultline_auth import Principal, get_principal
 from app.core.db import get_session
 from app.errors.schemas import (
     EventDetail,

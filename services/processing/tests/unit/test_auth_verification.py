@@ -12,8 +12,14 @@ import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
-from app.core.auth import Principal, get_jwks_provider, get_principal, reset_jwks_provider
-from app.core.config import settings
+from faultline_auth import (
+    AuthConfigurationError,
+    Principal,
+    configure_auth,
+    get_principal,
+    get_token_verifier,
+    reset_auth_cache,
+)
 
 
 def make_test_token(
@@ -60,12 +66,15 @@ def make_test_token(
 
 @pytest.fixture(autouse=True)
 def configure_auth_settings(rsa_keys, monkeypatch):
-    monkeypatch.setattr(settings, "auth_provider", "static")
-    monkeypatch.setattr(settings, "auth_issuer", "faultline-control-plane")
-    monkeypatch.setattr(settings, "auth_audience", "faultline")
-    monkeypatch.setattr(settings, "auth_leeway_seconds", 30)
-    monkeypatch.setattr(settings, "auth_public_key_path", rsa_keys["pub_key_path"])
-    monkeypatch.setattr(settings, "auth_jwt_key_id", rsa_keys["kid"])
+    reset_auth_cache()
+    monkeypatch.setenv("AUTH_PROVIDER", "static")
+    monkeypatch.setenv("AUTH_ISSUER", "faultline-control-plane")
+    monkeypatch.setenv("AUTH_AUDIENCE", "faultline")
+    monkeypatch.setenv("AUTH_LEEWAY_SECONDS", "30")
+    monkeypatch.setenv("AUTH_PUBLIC_KEY_PATH", rsa_keys["pub_key_path"])
+    monkeypatch.setenv("AUTH_JWT_KEY_ID", rsa_keys["kid"])
+    yield
+    reset_auth_cache()
 
 
 # 1. Valid token returns correct Principal
@@ -147,7 +156,8 @@ async def test_bad_signature_returns_401(rsa_keys):
 # 7. Expired token returns 401
 @pytest.mark.asyncio
 async def test_expired_token_returns_401(rsa_keys, monkeypatch):
-    monkeypatch.setattr(settings, "auth_leeway_seconds", 0)
+    monkeypatch.setenv("AUTH_LEEWAY_SECONDS", "0")
+    reset_auth_cache()
     token = make_test_token(
         rsa_keys["private_key"],
         kid=rsa_keys["kid"],
@@ -327,27 +337,28 @@ async def test_non_uuid_workspace_id_returns_403(rsa_keys):
     assert exc_info.value.detail == "You do not have permission to access this resource"
 
 
-# 17. Misconfiguration: missing or unreadable key file returns 401 and logs ERROR
+# 17. Misconfiguration at request time returns 500 and logs ERROR
 @pytest.mark.asyncio
 async def test_misconfiguration_missing_key_file(rsa_keys, monkeypatch, caplog):
-    monkeypatch.setattr(settings, "auth_public_key_path", "/nonexistent/path/public.pem")
+    monkeypatch.setenv("AUTH_PUBLIC_KEY_PATH", "/nonexistent/path/public.pem")
+    reset_auth_cache()
 
     token = make_test_token(rsa_keys["private_key"], workspace_id=uuid.uuid4())
     creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
     with pytest.raises(HTTPException) as exc_info:
         await get_principal(creds)
-    assert exc_info.value.status_code == 401
-    assert exc_info.value.detail == "Missing or invalid credentials"
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == "Internal server error"
     assert any("Authentication configuration error" in record.message for record in caplog.records)
 
 
 # 18. JWKS provider: valid token verified through JWKS
 @pytest.mark.asyncio
 async def test_jwks_provider_valid_token(rsa_keys, monkeypatch):
-    reset_jwks_provider()
-    monkeypatch.setattr(settings, "auth_provider", "jwks")
-    monkeypatch.setattr(settings, "auth_jwks_url", "http://test-control/.well-known/jwks.json")
+    monkeypatch.setenv("AUTH_PROVIDER", "jwks")
+    monkeypatch.setenv("AUTH_JWKS_URL", "http://test-control/.well-known/jwks.json")
+    reset_auth_cache()
 
     user_id = uuid.uuid4()
     workspace_id = uuid.uuid4()
@@ -360,8 +371,8 @@ async def test_jwks_provider_valid_token(rsa_keys, monkeypatch):
 
     transport = httpx.MockTransport(lambda req: httpx.Response(200, json=rsa_keys["jwks"]))
     async with httpx.AsyncClient(transport=transport) as mock_client:
-        provider = get_jwks_provider()
-        provider._client = mock_client
+        verifier = get_token_verifier()
+        verifier.key_provider._client = mock_client
 
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
         principal = await get_principal(creds)
@@ -373,9 +384,9 @@ async def test_jwks_provider_valid_token(rsa_keys, monkeypatch):
 # 19. JWKS provider: cache hit within TTL avoids repeat HTTP calls
 @pytest.mark.asyncio
 async def test_jwks_provider_cache_hit(rsa_keys, monkeypatch):
-    reset_jwks_provider()
-    monkeypatch.setattr(settings, "auth_provider", "jwks")
-    monkeypatch.setattr(settings, "auth_jwks_url", "http://test-control/.well-known/jwks.json")
+    monkeypatch.setenv("AUTH_PROVIDER", "jwks")
+    monkeypatch.setenv("AUTH_JWKS_URL", "http://test-control/.well-known/jwks.json")
+    reset_auth_cache()
 
     call_count = 0
 
@@ -386,8 +397,8 @@ async def test_jwks_provider_cache_hit(rsa_keys, monkeypatch):
 
     transport = httpx.MockTransport(jwks_handler)
     async with httpx.AsyncClient(transport=transport) as mock_client:
-        provider = get_jwks_provider()
-        provider._client = mock_client
+        verifier = get_token_verifier()
+        verifier.key_provider._client = mock_client
 
         token = make_test_token(rsa_keys["private_key"], kid="dev-1", workspace_id=uuid.uuid4())
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
@@ -403,10 +414,10 @@ async def test_jwks_provider_cache_hit(rsa_keys, monkeypatch):
 # 20. JWKS provider: stale cache used when JWKS fetch fails
 @pytest.mark.asyncio
 async def test_jwks_provider_stale_cache_on_fetch_failure(rsa_keys, monkeypatch):
-    reset_jwks_provider()
-    monkeypatch.setattr(settings, "auth_provider", "jwks")
-    monkeypatch.setattr(settings, "auth_jwks_url", "http://test-control/.well-known/jwks.json")
-    monkeypatch.setattr(settings, "auth_jwks_cache_ttl_seconds", 0)  # Expire immediately
+    monkeypatch.setenv("AUTH_PROVIDER", "jwks")
+    monkeypatch.setenv("AUTH_JWKS_URL", "http://test-control/.well-known/jwks.json")
+    monkeypatch.setenv("AUTH_JWKS_CACHE_TTL_SECONDS", "0")  # Expire immediately
+    reset_auth_cache()
 
     should_fail = False
 
@@ -417,8 +428,8 @@ async def test_jwks_provider_stale_cache_on_fetch_failure(rsa_keys, monkeypatch)
 
     transport = httpx.MockTransport(jwks_handler)
     async with httpx.AsyncClient(transport=transport) as mock_client:
-        provider = get_jwks_provider()
-        provider._client = mock_client
+        verifier = get_token_verifier()
+        verifier.key_provider._client = mock_client
 
         token = make_test_token(rsa_keys["private_key"], kid="dev-1", workspace_id=uuid.uuid4())
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
@@ -433,23 +444,31 @@ async def test_jwks_provider_stale_cache_on_fetch_failure(rsa_keys, monkeypatch)
         assert p2 is not None
 
 
-# 21. JWKS provider: empty cache and fetch fails returns 401 and logs ERROR
+# 21. JWKS provider: empty cache and fetch fails returns 503 and logs ERROR
 @pytest.mark.asyncio
-async def test_jwks_provider_empty_cache_fetch_fails_returns_401(rsa_keys, monkeypatch, caplog):
-    reset_jwks_provider()
-    monkeypatch.setattr(settings, "auth_provider", "jwks")
-    monkeypatch.setattr(settings, "auth_jwks_url", "http://test-control/.well-known/jwks.json")
+async def test_jwks_provider_empty_cache_fetch_fails_returns_503(rsa_keys, monkeypatch, caplog):
+    monkeypatch.setenv("AUTH_PROVIDER", "jwks")
+    monkeypatch.setenv("AUTH_JWKS_URL", "http://test-control/.well-known/jwks.json")
+    reset_auth_cache()
 
     transport = httpx.MockTransport(lambda req: httpx.Response(503, text="Service Unavailable"))
     async with httpx.AsyncClient(transport=transport) as mock_client:
-        provider = get_jwks_provider()
-        provider._client = mock_client
+        verifier = get_token_verifier()
+        verifier.key_provider._client = mock_client
 
         token = make_test_token(rsa_keys["private_key"], kid="dev-1", workspace_id=uuid.uuid4())
         creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
         with pytest.raises(HTTPException) as exc_info:
             await get_principal(creds)
-        assert exc_info.value.status_code == 401
-        assert exc_info.value.detail == "Missing or invalid credentials"
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail == "Authentication temporarily unavailable"
         assert any("Authentication keys unavailable" in r.message for r in caplog.records)
+
+
+# 22. Fast-fail at startup on misconfiguration
+def test_configure_auth_fails_fast_on_invalid_env(monkeypatch):
+    monkeypatch.setenv("AUTH_PROVIDER", "invalid_provider")
+    reset_auth_cache()
+    with pytest.raises(AuthConfigurationError, match="Unsupported auth provider"):
+        configure_auth()

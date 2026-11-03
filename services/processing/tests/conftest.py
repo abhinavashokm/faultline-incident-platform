@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
-from app.core.auth import Principal, get_principal
+from faultline_auth import Principal, get_principal
 from app.core.config import settings
 from app.core.db import get_session
 from app.main import create_app

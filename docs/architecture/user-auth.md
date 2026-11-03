@@ -63,13 +63,26 @@ Stored by the Control Plane so they can be revoked. Logout and bans revoke the s
 
 ## Shared library: `libs/faultline-auth`
 
-Provides JWKS caching, token verification, FastAPI dependencies, and a principal object (`user_id`, `workspace_id`, `sid`). It contains no business authorization, repositories, or database models. Configuration comes from environment variables.
+Provides JWKS caching, token verification, process-wide cached verifier factory (`configure_auth`, `get_token_verifier`), FastAPI dependencies (`get_principal`, `AuthDependencies`), and a principal object (`user_id`, `workspace_id`, `session_id`, `role`). It contains no business authorization, repositories, or database models. Configuration comes from environment variables prefixed with `AUTH_`.
 
 ```python
 @router.get("/issues")
 async def list_issues(principal: Principal = Depends(get_principal)):
     return await issue_service.list(workspace_id=principal.workspace_id)
 ```
+
+### Shared Error Response Policy
+
+All services using `faultline-auth` adhere to a consistent error policy and never leak internal exception details to clients:
+
+| Situation | Status | Headers | Client `detail` |
+|---|---|---|---|
+| Missing/non-Bearer/empty credentials | 401 | `WWW-Authenticate: Bearer` | "Missing or invalid credentials" |
+| `InvalidToken` (bad signature, expired, wrong iss/aud/alg, unknown kid, bad claims) | 401 | `WWW-Authenticate: Bearer` | "Missing or invalid credentials" |
+| `InvalidWorkspaceClaim` (catch before `InvalidToken`) | 403 | — | "You do not have permission to access this resource" |
+| `KeysUnavailable` | 503 | — | "Authentication temporarily unavailable" |
+| `AuthConfigurationError` at request time | 500 | — | "Internal server error" |
+| Valid token but `workspace_id` is None (in `get_principal`) | 403 | — | "You do not have permission to access this resource" |
 
 ## Tenant isolation
 
@@ -99,26 +112,26 @@ Exact schemas are in OpenAPI and the Postman collection (not yet verified agains
 
 - Logout does not invalidate an issued access token. It stays valid until `exp`.
 - Role or membership changes do not affect tokens already issued.
-- **Planned denylist:** Redis entry `revoked_sid:<sid>`, TTL equal to the access-token lifetime, written by the Control Plane on logout, ban, or password change, and checked by `faultline-auth` after signature verification. Behavior when Redis is down (fail open or closed) is undecided.
+- **Planned denylist:** Redis entry `revoked_sid:<sid>`, TTL equal to the access-token lifetime, written by the Control Plane on logout, ban, or password change, and checked by `faultline-auth` after signature verification. Behavior when Redis is down (fail open or closed) is undecided / planned.
 - Workspace switching is out of scope (future work).
 
 ## Open decisions
 
 | Item | Status |
 |---|---|
-| Access-token lifetime | Confirm in config |
-| Refresh rotation, reuse detection, storage, expiry | Needs decision |
-| Service-to-service identity | Needs decision |
-| `iss` and `aud` values | Needs decision, must match across services |
-| Denylist behavior when Redis is down | Needs decision |
+| Access-token lifetime | Confirm in config (15 min in Control Plane) |
+| Refresh rotation, reuse detection, storage, expiry | Undecided / planned |
+| Service-to-service identity | Undecided / planned |
+| `iss` and `aud` values | Configured (`faultline-control-plane` / `faultline`) |
+| `sid` denylist (Redis down behavior) | Undecided / planned |
 
 ## Status
 
-Snapshot from the 2026-10-29 handoff, not a code audit.
-
 | Item | Status |
 |---|---|
-| Token issuance, JWKS, refresh sessions, logout | Planned, check repo |
-| `libs/faultline-auth` | Planned. Confirm it exists and is installed in each service |
-| Redis denylist | Planned |
+| Token issuance, JWKS, refresh sessions, logout | Implemented in Control Plane |
+| `libs/faultline-auth` | Implemented; includes shared factory, `get_principal`, and standardized error policy |
+| Redis `sid` denylist | Planned / undecided |
+| Refresh rotation | Planned / undecided |
+| Service-to-service identity | Planned / undecided |
 | Postman collection | Generated, not tested against the API |

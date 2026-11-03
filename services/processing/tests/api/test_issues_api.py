@@ -8,7 +8,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core.auth import Principal, get_principal
+from faultline_auth import Principal, get_principal
 from app.errors.cursor import encode_issue_cursor
 from app.errors.models import ErrorEvent, Issue
 from app.main import create_app

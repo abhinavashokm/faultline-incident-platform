@@ -9,3 +9,6 @@ class InvalidWorkspaceClaim(InvalidToken):
 class KeysUnavailable(Exception):
     """Raised when key provider cannot obtain keys to verify a token."""
 
+
+class AuthConfigurationError(Exception):
+    """Raised when authentication settings or key provider configuration is invalid."""
