@@ -90,7 +90,7 @@ All services using `faultline-auth` adhere to a consistent error policy and neve
 - API URLs carry no workspace ID or slug (`GET /api/v1/projects`). Frontend slugs are for navigation only.
 - Scope queries by `workspace_id` directly. Return `404` for resources outside the workspace.
 - Enforce authorization in the owning service, not only in the gateway or frontend.
-- The gateway only routes. Services always verify tokens themselves.
+- The gateway only routes and forwards the Authorization header unchanged. Services always verify tokens themselves.
 - Service-to-service calls use a separate identity, never a forwarded user token.
 
 ## Endpoints
