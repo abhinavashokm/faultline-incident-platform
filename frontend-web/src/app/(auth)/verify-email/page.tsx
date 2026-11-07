@@ -9,6 +9,7 @@ import { AuthShell } from "@/components/layout/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useVerifyEmail, useResendOtp } from "@/features/auth/hooks";
+import { AuthErrorAlert } from "@/features/auth/components/auth-error-alert";
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -155,13 +156,7 @@ function VerifyEmailContent() {
           <Mail className="h-6 w-6" />
         </div>
 
-        {formError && (
-          <Alert variant="destructive" className="mb-5 text-left">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="text-body-sm font-semibold">Verification Error</AlertTitle>
-            <AlertDescription>{formError}</AlertDescription>
-          </Alert>
-        )}
+        <AuthErrorAlert error={formError} className="w-full text-left mb-5" />
 
         {successMsg && (
           <Alert variant="success" className="mb-5 text-left">

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/form";
 import { loginSchema, LoginFormData } from "@/features/auth/schemas";
 import { useLogin } from "@/features/auth/hooks";
+import { AuthErrorAlert } from "@/features/auth/components/auth-error-alert";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -84,13 +85,7 @@ export default function LoginPage() {
         </p>
       }
     >
-      {formError && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle className="text-body-sm font-semibold">Authentication Failed</AlertTitle>
-          <AlertDescription>{formError}</AlertDescription>
-        </Alert>
-      )}
+      <AuthErrorAlert error={formError} />
 
       {resetSent && (
         <Alert variant="info" className="mb-4">

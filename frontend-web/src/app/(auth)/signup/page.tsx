@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/form";
 import { signupSchema, SignupFormData } from "@/features/auth/schemas";
 import { useSignup } from "@/features/auth/hooks";
+import { AuthErrorAlert } from "@/features/auth/components/auth-error-alert";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -35,7 +36,6 @@ export default function SignupPage() {
       email: "",
       password: "",
       confirmPassword: "",
-      terms: false,
     },
     mode: "onChange",
   });
@@ -79,13 +79,7 @@ export default function SignupPage() {
         </p>
       }
     >
-      {formError && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle className="text-body-sm font-semibold">Sign Up Failed</AlertTitle>
-          <AlertDescription>{formError}</AlertDescription>
-        </Alert>
-      )}
+      <AuthErrorAlert error={formError} />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -240,33 +234,6 @@ export default function SignupPage() {
                       <Eye className="h-4 w-4" />
                     )}
                   </button>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="terms"
-            render={({ field }) => (
-              <FormItem className="space-y-0 pt-1">
-                <div className="flex items-start gap-2.5">
-                  <FormControl>
-                    <input
-                      type="checkbox"
-                      id="terms"
-                      checked={field.value}
-                      onChange={field.onChange}
-                      disabled={isPending}
-                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary focus:ring-offset-0 mt-0.5 cursor-pointer"
-                    />
-                  </FormControl>
-                  <label htmlFor="terms" className="text-body-sm text-text-secondary cursor-pointer leading-tight">
-                    I agree to the{" "}
-                    <span className="text-primary hover:underline">Terms of Service</span> and{" "}
-                    <span className="text-primary hover:underline">Privacy Policy</span>.
-                  </label>
                 </div>
                 <FormMessage />
               </FormItem>

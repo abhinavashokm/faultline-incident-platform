@@ -29,9 +29,6 @@ export const signupSchema = z
       .regex(/[A-Z]/, "Include at least one uppercase letter")
       .regex(/[0-9]/, "Include at least one number"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
-    terms: z.boolean().refine((val) => val === true, {
-      message: "You must agree to the Terms of Service and Privacy Policy",
-    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
