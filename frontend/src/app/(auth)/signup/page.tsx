@@ -32,10 +32,10 @@ export default function SignupPage() {
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
+      name: "Demo Developer",
+      email: "developer3@example.com",
+      password: "passwordA1",
+      confirmPassword: "passwordA1",
     },
     mode: "onChange",
   });
