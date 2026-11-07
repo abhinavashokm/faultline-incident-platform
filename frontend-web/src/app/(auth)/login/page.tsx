@@ -29,11 +29,13 @@ export default function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
 
+  const isDev = process.env.NODE_ENV === "development";
+
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: isDev ? "developer2@example.com" : "",
+      password: isDev ? "ChangeMe-Strong-Password" : "",
       remember: false,
     },
   });
