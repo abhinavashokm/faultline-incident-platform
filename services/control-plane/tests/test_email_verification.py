@@ -297,8 +297,9 @@ async def test_verify_email_success(
     )
     assert verify_resp.status_code == 200
     data = verify_resp.json()
-    assert data["message"] == "Email verified"
-    assert "email_verified_at" in data
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert "refresh_token" in verify_resp.cookies
 
     # Check DB state
     user = (
@@ -346,13 +347,13 @@ async def test_verify_email_already_verified_idempotent(
     )
     assert first_resp.status_code == 200
 
-    # Second call returns 200 idempotently
+    # Second call returns 200 idempotently with tokens
     second_resp = await client.post(
         "/api/v1/auth/verify-email",
         json={"email": "idempotent@example.com", "code": "999999"},
     )
     assert second_resp.status_code == 200
-    assert second_resp.json()["message"] == "Email verified"
+    assert "access_token" in second_resp.json()
 
 
 @pytest.mark.asyncio

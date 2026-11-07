@@ -140,6 +140,68 @@ class AuthService:
         )
         return user, summary
 
+    async def _issue_tokens_for_user(
+        self, user: User, now: datetime
+    ) -> TokenResponse:
+        await self.repository.update_last_login(user.id, now)
+
+        # Create RefreshSession
+        session_expires_at = now + timedelta(days=settings.refresh_token_ttl_days)
+        refresh_session = RefreshSession(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            created_at=now,
+            expires_at=session_expires_at,
+        )
+        await self.repository.create_refresh_session(refresh_session)
+
+        # Create first RefreshToken (opaque 48 urlsafe bytes, store sha256 hex)
+        raw_refresh_token = secrets.token_urlsafe(48)
+        token_hash = hash_refresh_token(raw_refresh_token)
+        token_record = RefreshToken(
+            id=uuid.uuid4(),
+            session_id=refresh_session.id,
+            token_hash=token_hash,
+            created_at=now,
+            expires_at=session_expires_at,
+        )
+        await self.repository.create_refresh_token(token_record)
+
+        # Resolve membership
+        ws_repo = WorkspaceRepository(self.session)
+        memberships = await ws_repo.get_memberships(user.id)
+        workspace_info = None
+        workspace_id = None
+        role = None
+        if memberships:
+            first_member, first_workspace = memberships[0]
+            workspace_id = first_workspace.id
+            role = first_member.role
+            workspace_info = WorkspaceWithRole(
+                id=first_workspace.id,
+                name=first_workspace.name,
+                slug=first_workspace.slug,
+                role=first_member.role,
+            )
+
+        # Issue access token
+        ttl = timedelta(minutes=settings.access_token_ttl_minutes)
+        access_token = create_access_token(
+            user_id=user.id,
+            workspace_id=workspace_id,
+            role=role,
+            sid=refresh_session.id,
+            ttl=ttl,
+            now=now,
+        )
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=raw_refresh_token,
+            token_type="bearer",
+            expires_in=int(ttl.total_seconds()),
+            workspace=workspace_info,
+        )
+
     async def login(self, payload: LoginRequest) -> TokenResponse:
         async with self.session.begin():
             user = await self.repository.get_by_email(payload.email)
@@ -165,65 +227,9 @@ class AuthService:
                 raise EmailNotVerified("email_not_verified")
 
             now = datetime.now(timezone.utc)
-            await self.repository.update_last_login(user.id, now)
-
-            # Create RefreshSession
-            session_expires_at = now + timedelta(days=settings.refresh_token_ttl_days)
-            refresh_session = RefreshSession(
-                id=uuid.uuid4(),
-                user_id=user.id,
-                created_at=now,
-                expires_at=session_expires_at,
-            )
-            await self.repository.create_refresh_session(refresh_session)
-
-            # Create first RefreshToken (opaque 48 urlsafe bytes, store sha256 hex)
-            raw_refresh_token = secrets.token_urlsafe(48)
-            token_hash = hash_refresh_token(raw_refresh_token)
-            token_record = RefreshToken(
-                id=uuid.uuid4(),
-                session_id=refresh_session.id,
-                token_hash=token_hash,
-                created_at=now,
-                expires_at=session_expires_at,
-            )
-            await self.repository.create_refresh_token(token_record)
-
-            # Resolve membership
-            ws_repo = WorkspaceRepository(self.session)
-            memberships = await ws_repo.get_memberships(user.id)
-            workspace_info = None
-            workspace_id = None
-            role = None
-            if memberships:
-                first_member, first_workspace = memberships[0]
-                workspace_id = first_workspace.id
-                role = first_member.role
-                workspace_info = WorkspaceWithRole(
-                    id=first_workspace.id,
-                    name=first_workspace.name,
-                    slug=first_workspace.slug,
-                    role=first_member.role,
-                )
-
-            # Issue access token
-            ttl = timedelta(minutes=settings.access_token_ttl_minutes)
-            access_token = create_access_token(
-                user_id=user.id,
-                workspace_id=workspace_id,
-                role=role,
-                sid=refresh_session.id,
-                ttl=ttl,
-                now=now,
-            )
+            tokens = await self._issue_tokens_for_user(user, now)
             logger.info("User logged in successfully: user_id=%s", user.id)
-            return TokenResponse(
-                access_token=access_token,
-                refresh_token=raw_refresh_token,
-                token_type="bearer",
-                expires_in=int(ttl.total_seconds()),
-                workspace=workspace_info,
-            )
+            return tokens
 
     async def refresh(self, payload: RefreshRequest) -> TokenResponse:
         token_hash = hash_refresh_token(payload.refresh_token)
@@ -392,10 +398,10 @@ class AuthService:
 
     async def verify_email(
         self, payload: VerifyEmailRequest
-    ) -> VerifyEmailResponse:
+    ) -> TokenResponse:
         now = datetime.now(timezone.utc)
         error_to_raise: Exception | None = None
-        response: VerifyEmailResponse | None = None
+        response: TokenResponse | None = None
 
         async with self.session.begin():
             user = await self.repository.get_by_email(payload.email)
@@ -405,10 +411,7 @@ class AuthService:
 
             if user.email_verified_at is not None:
                 logger.info("Verify email: user %s already verified", user.id)
-                return VerifyEmailResponse(
-                    message="Email verified",
-                    email_verified_at=user.email_verified_at.isoformat(),
-                )
+                return await self._issue_tokens_for_user(user, now)
 
             code_record = await self.verification_repo.get_active_by_user_id(
                 user.id, for_update=True
@@ -456,10 +459,7 @@ class AuthService:
                     code_record.id, consumed_at=now
                 )
                 await self.repository.update_email_verified_at(user.id, now)
-                response = VerifyEmailResponse(
-                    message="Email verified",
-                    email_verified_at=now.isoformat(),
-                )
+                response = await self._issue_tokens_for_user(user, now)
 
         if error_to_raise is not None:
             raise error_to_raise

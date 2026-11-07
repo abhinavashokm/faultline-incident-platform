@@ -29,3 +29,8 @@ export interface UserResponse {
   workspace?: Workspace | null;
 }
 
+export interface ResendVerificationResponse {
+  message: string;
+}
+
+

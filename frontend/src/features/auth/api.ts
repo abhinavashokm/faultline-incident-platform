@@ -1,6 +1,7 @@
-import { delay, ApiError, apiClient, setAccessToken } from "@/lib/api-client";
+import { ApiError, apiClient, setAccessToken } from "@/lib/api-client";
 import {
   AuthResponse,
+  ResendVerificationResponse,
   UserResponse,
 } from "./types";
 import {
@@ -33,34 +34,23 @@ export async function verifyOtpApi(
   email: string,
   data: VerifyOtpFormData
 ): Promise<AuthResponse> {
-  await delay(600);
+  const response = await apiClient.post<AuthResponse>("/api/v1/auth/verify-email", {
+    email,
+    code: data.code,
+  });
 
-  if (data.code === "999999") {
-    throw new ApiError(410, "Verification code has expired. Please request a new code.");
-  }
+  // Store access token in JS memory so user is authenticated
+  setAccessToken(response.access_token);
 
-  if (data.code === "000000") {
-    throw new ApiError(400, "Invalid verification code. Please check and try again.");
-  }
-
-  return {
-    access_token: "mock-jwt-token-verified",
-    refresh_token: "mock-refresh-token",
-    token_type: "bearer",
-    expires_in: 900,
-    workspace: {
-      id: "ws_4409ef12",
-      slug: "acme-cloud",
-      name: "Acme Cloud",
-    },
-  };
+  return response;
 }
 
-export async function resendOtpApi(email: string): Promise<{ success: boolean; message: string }> {
-  await delay(500);
-  return {
-    success: true,
-    message: `A fresh 6-digit verification code has been dispatched to ${email}.`,
-  };
+export async function resendOtpApi(
+  email: string
+): Promise<ResendVerificationResponse> {
+  return await apiClient.post<ResendVerificationResponse>(
+    "/api/v1/auth/resend-verification",
+    { email }
+  );
 }
 

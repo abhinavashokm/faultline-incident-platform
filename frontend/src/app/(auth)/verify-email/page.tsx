@@ -127,9 +127,9 @@ function VerifyEmailContent() {
     setSuccessMsg(null);
 
     resendOtp(emailParam, {
-      onSuccess: () => {
+      onSuccess: (data) => {
         setCooldown(30);
-        setSuccessMsg("A new verification code has been dispatched to your email.");
+        setSuccessMsg(data.message || "A new verification code has been dispatched to your email.");
       },
       onError: (err: any) => {
         setFormError(err.message || "Failed to resend code. Please try again.");
@@ -166,7 +166,7 @@ function VerifyEmailContent() {
           </Alert>
         )}
 
-        <div className="flex items-center justify-center gap-2 sm:gap-2.5 my-3">
+        <div className="flex items-center justify-center gap-2 sm:gap-2.5 my-3 mb-6">
           {otp.map((digit, idx) => (
             <input
               key={idx}
@@ -185,10 +185,6 @@ function VerifyEmailContent() {
             />
           ))}
         </div>
-
-        <p className="font-mono text-[11px] text-text-muted mt-2 mb-5">
-          Tip: Enter any 6 digits (e.g. 123456). Use 999999 to test expired, 000000 for invalid.
-        </p>
 
         <Button
           onClick={handleVerify}

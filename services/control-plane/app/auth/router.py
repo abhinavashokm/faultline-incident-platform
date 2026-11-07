@@ -68,15 +68,25 @@ async def signup(
 @router.post(
     "/verify-email",
     status_code=status.HTTP_200_OK,
-    response_model=VerifyEmailResponse,
+    response_model=TokenResponse,
 )
 async def verify_email(
     payload: VerifyEmailRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
-) -> VerifyEmailResponse:
+    response: Response,
+) -> TokenResponse:
     service = AuthService(session)
     try:
-        return await service.verify_email(payload)
+        tokens = await service.verify_email(payload)
+        response.set_cookie(
+            key="refresh_token",
+            value=tokens.refresh_token,
+            httponly=True,
+            secure=False,  # Can be true in production with HTTPS
+            samesite="lax",
+            path="/api/v1/auth",
+        )
+        return tokens
     except InvalidVerificationCode as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
