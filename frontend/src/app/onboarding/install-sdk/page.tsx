@@ -224,7 +224,7 @@ function InstallSdkContent() {
                   Python SDK Setup
                 </h2>
                 <p className="text-body-sm text-text-secondary">
-                  Works with FastAPI, Starlette, Django, Flask, Celery, and custom ASGI/WSGI applications.
+                  Works with FastAPI / ASGI applications.
                 </p>
               </div>
             </div>

@@ -175,7 +175,7 @@ export default function CreateProjectPage() {
                 <div className="flex items-center justify-between">
                   <FormLabel>Runtime Platform</FormLabel>
                   <span className="text-label-sm text-text-muted">
-                    Auto-instrumented SDK
+                    Python SDK
                   </span>
                 </div>
 
@@ -196,7 +196,7 @@ export default function CreateProjectPage() {
                         Python
                       </div>
                       <div className="text-[11px] text-text-secondary truncate mt-0.5">
-                        FastAPI, Django, Flask ASGI, and Celery
+                        FastAPI / ASGI
                       </div>
                     </div>
                   </div>
@@ -204,7 +204,7 @@ export default function CreateProjectPage() {
 
                 <p className="text-label-sm text-text-muted flex items-center gap-1.5 pt-1">
                   <Info className="h-3.5 w-3.5" />
-                  <span>More SDKs coming soon (JavaScript, Node.js, Go, Java).</span>
+                  <span>More frameworks and SDKs coming soon.</span>
                 </p>
               </div>
 
