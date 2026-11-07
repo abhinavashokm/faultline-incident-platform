@@ -27,12 +27,14 @@ interface NavItem {
 
 interface SidebarProps {
   workspaceSlug: string;
+  workspaceName: string;
   isMobileOpen: boolean;
   onMobileClose: () => void;
 }
 
 export function Sidebar({
   workspaceSlug,
+  workspaceName,
   isMobileOpen,
   onMobileClose,
 }: SidebarProps) {
@@ -193,7 +195,7 @@ export function Sidebar({
             </div>
             <div className="min-w-0 flex-1 md:hidden lg:block">
               <div className="text-label-md font-semibold text-text-primary truncate">
-                Acme Cloud
+                {workspaceName}
               </div>
               <div className="text-[11px] font-mono text-text-muted truncate">
                 cluster: us-east-k8s

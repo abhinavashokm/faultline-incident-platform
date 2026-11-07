@@ -28,6 +28,7 @@ import {
   CreateProjectFormData,
 } from "@/features/projects/schemas";
 import { useCreateProject } from "@/features/projects/hooks";
+import { useCurrentWorkspace } from "@/features/workspace/hooks";
 
 export default function CreateProjectPage() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function CreateProjectPage() {
   });
 
   const { mutate: createProject, isPending } = useCreateProject();
+  const { data: workspace } = useCurrentWorkspace();
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -98,7 +100,7 @@ export default function CreateProjectPage() {
           </div>
 
           <div className="text-label-sm text-text-secondary font-mono">
-            Acme Cloud
+            {workspace?.name ?? "—"}
           </div>
         </div>
       </header>

@@ -23,6 +23,8 @@ import {
 import { loginSchema, LoginFormData } from "@/features/auth/schemas";
 import { useLogin } from "@/features/auth/hooks";
 import { AuthErrorAlert } from "@/features/auth/components/auth-error-alert";
+import { useAuth } from "@/features/auth/auth-context";
+import { listProjectsApi } from "@/features/projects/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,15 +44,28 @@ export default function LoginPage() {
   });
 
   const { mutate: login, isPending } = useLogin();
+  const { onLoginSuccess } = useAuth();
 
   function onSubmit(values: LoginFormData) {
     setFormError(null);
     setResetSent(false);
 
     login(values, {
-      onSuccess: (data) => {
+      onSuccess: async (data) => {
+        onLoginSuccess();
         const slug = data.workspace?.slug || "overview";
-        router.push(`/${slug}/overview`);
+        try {
+          const projects = await listProjectsApi();
+          if (projects.length === 0) {
+            router.push("/onboarding/create-project");
+          } else {
+            router.push(`/${slug}/overview`);
+          }
+        } catch {
+          // If the project list fetch fails, fall back to the dashboard;
+          // the layout guard will re-check and redirect if still needed.
+          router.push(`/${slug}/overview`);
+        }
       },
       onError: (err: any) => {
         if (err.message === "email_not_verified" || err.details?.detail === "email_not_verified" || err.details?.unverified) {

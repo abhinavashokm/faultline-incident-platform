@@ -1,7 +1,11 @@
-import { delay } from "@/lib/api-client";
+import { apiClient, delay } from "@/lib/api-client";
 import { CreateProjectFormData } from "./schemas";
 import { Project, SdkConfig, LiveStatusEvent } from "./types";
 import { DEFAULT_SDK } from "./sdk-config";
+
+export async function listProjectsApi(): Promise<Project[]> {
+  return apiClient.get<Project[]>("/api/v1/projects");
+}
 
 export async function createProjectApi(data: CreateProjectFormData): Promise<Project> {
   await delay(600);

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useVerifyEmail, useResendOtp } from "@/features/auth/hooks";
 import { AuthErrorAlert } from "@/features/auth/components/auth-error-alert";
+import { useAuth } from "@/features/auth/auth-context";
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -25,6 +26,7 @@ function VerifyEmailContent() {
 
   const { mutate: verifyOtp, isPending } = useVerifyEmail(emailParam);
   const { mutate: resendOtp, isPending: isResending } = useResendOtp();
+  const { onLoginSuccess } = useAuth();
 
   // Mask email for display
   const maskedEmail = React.useMemo(() => {
@@ -107,6 +109,7 @@ function VerifyEmailContent() {
       { code },
       {
         onSuccess: () => {
+          onLoginSuccess();
           setSuccessMsg("Email successfully verified! Redirecting to project onboarding...");
           setTimeout(() => {
             router.push("/onboarding/create-project");

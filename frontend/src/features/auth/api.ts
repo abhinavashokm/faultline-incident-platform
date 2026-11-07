@@ -1,4 +1,4 @@
-import { ApiError, apiClient, setAccessToken } from "@/lib/api-client";
+import { ApiError, apiClient, setAccessToken, refreshAccessToken } from "@/lib/api-client";
 import {
   AuthResponse,
   ResendVerificationResponse,
@@ -53,4 +53,11 @@ export async function resendOtpApi(
     { email }
   );
 }
+
+/**
+ * Calls the refresh endpoint directly (used by AuthProvider on bootstrap).
+ * For the shared in-flight singleton used by the api-client interceptor,
+ * import refreshAccessToken from "@/lib/api-client" instead.
+ */
+export { refreshAccessToken as refreshApi };
 
