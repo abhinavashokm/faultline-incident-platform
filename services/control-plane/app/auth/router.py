@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import AuthContext, current_user
@@ -122,10 +122,20 @@ async def resend_verification(
 async def login(
     payload: LoginRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
+    response: Response,
 ) -> TokenResponse:
     service = AuthService(session)
     try:
-        return await service.login(payload)
+        tokens = await service.login(payload)
+        response.set_cookie(
+            key="refresh_token",
+            value=tokens.refresh_token,
+            httponly=True,
+            secure=False,  # Can be true in production with HTTPS
+            samesite="lax",
+            path="/api/v1/auth",
+        )
+        return tokens
     except EmailNotVerified as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -1,4 +1,4 @@
-import { delay, ApiError } from "@/lib/api-client";
+import { delay, ApiError, apiClient, setAccessToken } from "@/lib/api-client";
 import {
   AuthResponse,
   VerificationResponse,
@@ -10,33 +10,15 @@ import {
 } from "./schemas";
 
 export async function loginApi(data: LoginFormData): Promise<AuthResponse> {
-  await delay(600);
+  const response = await apiClient.post<AuthResponse>("/api/v1/auth/login", {
+    email: data.email,
+    password: data.password,
+  });
 
-  if (data.email.toLowerCase() === "invalid@faultline.io" || data.password === "wrongpassword") {
-    throw new ApiError(401, "Invalid email or password combination. Please try again.");
-  }
+  // Store access token in JS memory
+  setAccessToken(response.access_token);
 
-  if (data.email.toLowerCase() === "unverified@faultline.io") {
-    throw new ApiError(403, "Email verification required before login.", {
-      unverified: true,
-      email: data.email,
-    });
-  }
-
-  return {
-    token: "mock-jwt-token-faultline-sre",
-    user: {
-      id: "usr_7f81b2c4",
-      name: "Elena Vance",
-      email: data.email,
-      avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop",
-    },
-    workspace: {
-      id: "ws_4409ef12",
-      slug: "acme-cloud",
-      name: "Acme Cloud",
-    },
-  };
+  return response;
 }
 
 export async function signupApi(data: SignupFormData): Promise<VerificationResponse> {
@@ -68,12 +50,10 @@ export async function verifyOtpApi(
   }
 
   return {
-    token: "mock-jwt-token-verified",
-    user: {
-      id: "usr_8271ab99",
-      name: email.split("@")[0],
-      email: email,
-    },
+    access_token: "mock-jwt-token-verified",
+    refresh_token: "mock-refresh-token",
+    token_type: "bearer",
+    expires_in: 900,
     workspace: {
       id: "ws_4409ef12",
       slug: "acme-cloud",

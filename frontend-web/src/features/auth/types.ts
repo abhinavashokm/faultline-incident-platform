@@ -9,12 +9,15 @@ export interface Workspace {
   id: string;
   slug: string;
   name: string;
+  role?: string | null;
 }
 
 export interface AuthResponse {
-  token: string;
-  user: User;
-  workspace: Workspace;
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  workspace?: Workspace | null;
 }
 
 export interface VerificationResponse {

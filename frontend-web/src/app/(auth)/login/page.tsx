@@ -46,10 +46,11 @@ export default function LoginPage() {
 
     login(values, {
       onSuccess: (data) => {
-        router.push(`/${data.workspace.slug}/overview`);
+        const slug = data.workspace?.slug || "overview";
+        router.push(`/${slug}/overview`);
       },
       onError: (err: any) => {
-        if (err.details?.unverified) {
+        if (err.message === "email_not_verified" || err.details?.detail === "email_not_verified" || err.details?.unverified) {
           router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
           return;
         }
@@ -59,12 +60,6 @@ export default function LoginPage() {
       },
     });
   }
-
-  const handleAutofillDemo = () => {
-    form.setValue("email", "dev@faultline.io");
-    form.setValue("password", "sre-prod-2025");
-    setFormError(null);
-  };
 
   const handleForgotPassword = () => {
     setFormError(null);
@@ -87,23 +82,6 @@ export default function LoginPage() {
         </p>
       }
     >
-      {/* Quick Demo Credentials Pill */}
-      <div className="mb-5 flex items-center justify-between rounded-md bg-primary-tint/70 border border-primary-subdued px-3 py-2 text-label-sm">
-        <div className="flex items-center gap-1.5 text-text-secondary">
-          <Info className="h-3.5 w-3.5 text-primary shrink-0" />
-          <span className="font-mono text-[11px] truncate">
-            Demo: dev@faultline.io
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={handleAutofillDemo}
-          className="text-primary font-medium hover:underline text-[11px] px-1.5 py-0.5 rounded bg-card border border-primary/20"
-        >
-          Autofill
-        </button>
-      </div>
-
       {formError && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
@@ -131,7 +109,6 @@ export default function LoginPage() {
               <FormItem>
                 <div className="flex items-center justify-between">
                   <FormLabel>Work email</FormLabel>
-                  <span className="font-mono text-[11px] text-text-muted">RFC 5322</span>
                 </div>
                 <FormControl>
                   <Input
