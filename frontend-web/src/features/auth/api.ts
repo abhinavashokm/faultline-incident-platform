@@ -1,7 +1,7 @@
 import { delay, ApiError, apiClient, setAccessToken } from "@/lib/api-client";
 import {
   AuthResponse,
-  VerificationResponse,
+  UserResponse,
 } from "./types";
 import {
   LoginFormData,
@@ -21,18 +21,12 @@ export async function loginApi(data: LoginFormData): Promise<AuthResponse> {
   return response;
 }
 
-export async function signupApi(data: SignupFormData): Promise<VerificationResponse> {
-  await delay(700);
-
-  if (data.email.toLowerCase() === "exists@faultline.io") {
-    throw new ApiError(409, "An account with this email address already exists.");
-  }
-
-  return {
-    status: "pending_verification",
+export async function signupApi(data: SignupFormData): Promise<UserResponse> {
+  return await apiClient.post<UserResponse>("/api/v1/auth/signup", {
+    full_name: data.name,
     email: data.email,
-    expiresInSeconds: 600,
-  };
+    password: data.password,
+  });
 }
 
 export async function verifyOtpApi(

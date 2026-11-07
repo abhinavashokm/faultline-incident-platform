@@ -20,9 +20,12 @@ export interface AuthResponse {
   workspace?: Workspace | null;
 }
 
-export interface VerificationResponse {
-  status: "pending_verification" | "verified";
+export interface UserResponse {
+  id: string;
   email: string;
-  expiresInSeconds: number;
+  full_name: string;
+  status: string;
+  created_at: string;
+  workspace?: Workspace | null;
 }
 
