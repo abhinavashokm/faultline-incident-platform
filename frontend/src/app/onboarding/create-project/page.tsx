@@ -24,13 +24,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   createProjectSchema,
   CreateProjectFormData,
 } from "@/features/projects/schemas";
@@ -44,6 +37,7 @@ export default function CreateProjectPage() {
     defaultValues: {
       name: "",
       slug: "",
+      description: "",
       environment: "production",
     },
     mode: "onChange",
@@ -117,7 +111,7 @@ export default function CreateProjectPage() {
               Create your project
             </h1>
             <p className="text-body-sm text-text-secondary mt-1">
-              Give your service a name and configure your default environment. You can set up the SDK in the next step.
+              Give your service a name and description. You can set up the SDK in the next step.
             </p>
           </div>
 
@@ -170,6 +164,28 @@ export default function CreateProjectPage() {
                 />
               </div>
 
+              {/* Description (Optional) */}
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Description</FormLabel>
+                      <span className="text-[11px] text-text-muted">Optional</span>
+                    </div>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. Core service handling payment workflows and webhooks"
+                        disabled={isPending}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Supported Platform (Single Python Card) */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
@@ -206,40 +222,6 @@ export default function CreateProjectPage() {
                   <Info className="h-3.5 w-3.5" />
                   <span>More frameworks and SDKs coming soon.</span>
                 </p>
-              </div>
-
-              {/* Environment (Optional) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <FormField
-                  control={form.control}
-                  name="environment"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Default Environment</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled={isPending}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select environment" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="production">production</SelectItem>
-                          <SelectItem value="staging">staging</SelectItem>
-                          <SelectItem value="development">development</SelectItem>
-                          <SelectItem value="canary">canary</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[11px] text-text-muted">
-                        Events without an environment tag default to this value.
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
               {/* Submit CTA */}

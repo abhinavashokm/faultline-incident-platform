@@ -10,6 +10,7 @@ export async function createProjectApi(data: CreateProjectFormData): Promise<Pro
     id: "proj_" + Math.random().toString(36).substring(2, 10),
     name: data.name,
     slug: data.slug,
+    description: data.description || null,
     environment: data.environment || "production",
     dsn: "https://fl_pub_9a82f1b4@ingest.faultline.io/42019",
     apiKey: "fl_sec_9a82f1b4892cfa7eb40",

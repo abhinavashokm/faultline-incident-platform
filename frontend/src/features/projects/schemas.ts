@@ -9,6 +9,7 @@ export const createProjectSchema = z.object({
     .string()
     .min(2, "Slug must be at least 2 characters")
     .regex(/^[a-z0-9-]+$/, "Slug must only contain lowercase letters, numbers, and hyphens"),
+  description: z.string().optional(),
   environment: z.string().optional().default("production"),
 });
 

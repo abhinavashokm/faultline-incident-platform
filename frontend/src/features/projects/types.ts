@@ -2,6 +2,7 @@ export interface Project {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   environment: string;
   dsn: string;
   apiKey: string;
