@@ -275,7 +275,7 @@ services:
   # ── Frontend ────────────────────────────────────────────────────────────────
   frontend:
     build:
-      context: ./frontend-web
+      context: ./frontend
       dockerfile: Dockerfile
       target: dev
     container_name: frontend
@@ -283,7 +283,7 @@ services:
       - "3000:3000"
     volumes:
       # Full bind-mount for HMR
-      - ./frontend-web:/app
+      - ./frontend:/app
       # Keep container node_modules and .next isolated from host filesystem
       - frontend_node_modules:/app/node_modules
       - /app/.next

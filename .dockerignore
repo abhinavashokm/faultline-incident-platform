@@ -5,8 +5,8 @@
 
 # Node
 node_modules/
-frontend-web/.next/
-frontend-web/out/
+frontend/.next/
+frontend/out/
 
 # Git
 .git/

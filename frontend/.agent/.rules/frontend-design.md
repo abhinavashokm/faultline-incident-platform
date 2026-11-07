@@ -2,7 +2,7 @@
 
 Project name: **Faultline**. Use this name everywhere (UI copy, titles, metadata, comments, docs). Never invent or use any other product name.
 
-Location in repo: `frontend-web/.agent/rules/frontend-design.md`
+Location in repo: `frontend/.agent/rules/frontend-design.md`
 
 ---
 
@@ -23,7 +23,7 @@ Location in repo: `frontend-web/.agent/rules/frontend-design.md`
 
 ## 3. Folder rules
 
-Follow the existing structure in `frontend-web/src`:
+Follow the existing structure in `frontend/src`:
 
 - `app/`: routing only. Pages and layouts stay thin. No business logic.
 - `features/<domain>/`: `api.ts`, `hooks.ts`, `schemas.ts`, `types.ts`, `components/`.
