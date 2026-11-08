@@ -37,8 +37,8 @@ export default function LoginPage() {
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: isDev ? "developer2@example.com" : "",
-      password: isDev ? "ChangeMe-Strong-Password" : "",
+      email: isDev ? "developer3@example.com" : "",
+      password: isDev ? "passwordA1" : "",
       remember: false,
     },
   });
@@ -72,6 +72,7 @@ export default function LoginPage() {
           router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
           return;
         }
+        console.log(err.message)
         setFormError(
           err.message || "Invalid credentials. Please verify your email and password."
         );

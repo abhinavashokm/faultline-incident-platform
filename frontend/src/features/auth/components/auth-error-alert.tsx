@@ -3,7 +3,7 @@ import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface AuthErrorAlertProps extends React.HTMLAttributes<HTMLDivElement> {
-  error?: string | null;
+  error?: React.ReactNode;
 }
 
 export function AuthErrorAlert({
@@ -12,10 +12,21 @@ export function AuthErrorAlert({
   children,
   ...props
 }: AuthErrorAlertProps) {
-  const content = error || children;
+  let content: React.ReactNode = error || children;
 
   if (!content) {
     return null;
+  }
+
+  if (typeof content === "object" && !React.isValidElement(content)) {
+    const obj = content as any;
+    if (obj.msg) {
+      content = String(obj.msg);
+    } else if (obj.message) {
+      content = String(obj.message);
+    } else {
+      content = JSON.stringify(obj);
+    }
   }
 
   return (

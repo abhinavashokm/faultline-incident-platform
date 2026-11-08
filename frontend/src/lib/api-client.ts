@@ -71,6 +71,25 @@ function buildUrl(path: string): string {
   return `${cleanBase}${cleanPath}`;
 }
 
+function extractErrorMessage(errorData: any, fallback: string): string {
+  if (!errorData) return fallback;
+  const detail = errorData.detail ?? errorData.message;
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    // FastAPI/Pydantic validation error list: [{ type, loc, msg, input }, ...]
+    return detail
+      .map((item) => (typeof item === "string" ? item : item?.msg || JSON.stringify(item)))
+      .filter(Boolean)
+      .join(", ") || fallback;
+  }
+  if (typeof detail === "object" && detail !== null) {
+    return detail.msg || detail.message || JSON.stringify(detail);
+  }
+  return fallback;
+}
+
 /**
  * Calls POST /api/v1/auth/refresh using the HttpOnly refresh-token cookie.
  * Returns the new access token on success. Throws on failure.
@@ -91,8 +110,7 @@ export async function refreshAccessToken(): Promise<string> {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const message =
-          errorData.detail || errorData.message || response.statusText;
+        const message = extractErrorMessage(errorData, response.statusText);
         throw new ApiError(response.status, message, errorData);
       }
 
@@ -125,11 +143,20 @@ function buildAuthHeaders(): Record<string, string> {
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const message =
-      errorData.detail || errorData.message || response.statusText;
+    const message = extractErrorMessage(errorData, response.statusText);
     throw new ApiError(response.status, message, errorData);
   }
   return response.json();
+}
+
+function isAuthEndpoint(path: string): boolean {
+  return (
+    path.includes("/api/v1/auth/login") ||
+    path.includes("/api/v1/auth/refresh") ||
+    path.includes("/api/v1/auth/signup") ||
+    path.includes("/api/v1/auth/verify-email") ||
+    path.includes("/api/v1/auth/resend-verification")
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -156,8 +183,8 @@ export const apiClient = {
       },
     });
 
-    // 401 interception: attempt one silent refresh then retry
-    if (response.status === 401 && !options?._retried) {
+    // 401 interception: attempt one silent refresh then retry (skip for auth endpoints)
+    if (response.status === 401 && !options?._retried && !isAuthEndpoint(path)) {
       await refreshAccessToken();
       return apiClient.get<T>(path, { ...options, _retried: true });
     }
@@ -182,8 +209,8 @@ export const apiClient = {
       body: body ? JSON.stringify(body) : undefined,
     });
 
-    // 401 interception: attempt one silent refresh then retry
-    if (response.status === 401 && !options?._retried) {
+    // 401 interception: attempt one silent refresh then retry (skip for auth endpoints)
+    if (response.status === 401 && !options?._retried && !isAuthEndpoint(path)) {
       await refreshAccessToken();
       return apiClient.post<T>(path, body, { ...options, _retried: true });
     }
