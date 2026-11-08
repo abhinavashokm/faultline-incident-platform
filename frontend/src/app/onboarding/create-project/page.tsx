@@ -30,6 +30,12 @@ import {
 import { useCreateProject } from "@/features/projects/hooks";
 import { useCurrentWorkspace } from "@/features/workspace/hooks";
 
+const RUNTIME_PLATFORM_CONFIG = {
+  value: "fastapi",
+  label: "FastAPI",
+  subtitle: "Python · ASGI",
+};
+
 export default function CreateProjectPage() {
   const router = useRouter();
 
@@ -40,6 +46,7 @@ export default function CreateProjectPage() {
       slug: "",
       description: "",
       environment: "production",
+      platform: RUNTIME_PLATFORM_CONFIG.value,
     },
     mode: "onChange",
   });
@@ -211,10 +218,10 @@ export default function CreateProjectPage() {
 
                     <div>
                       <div className="text-body-sm font-semibold text-text-primary">
-                        Python
+                        {RUNTIME_PLATFORM_CONFIG.label}
                       </div>
                       <div className="text-[11px] text-text-secondary truncate mt-0.5">
-                        FastAPI / ASGI
+                        {RUNTIME_PLATFORM_CONFIG.subtitle}
                       </div>
                     </div>
                   </div>

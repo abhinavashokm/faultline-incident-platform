@@ -4,6 +4,7 @@ export interface Project {
   slug: string;
   description?: string | null;
   environment: string;
+  platform?: string | null;
   dsn: string;
   apiKey: string;
   createdAt: string;

@@ -11,6 +11,7 @@ export const createProjectSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Slug must only contain lowercase letters, numbers, and hyphens"),
   description: z.string().optional(),
   environment: z.string().optional().default("production"),
+  platform: z.string().optional().default("fastapi"),
 });
 
 export type CreateProjectFormData = z.infer<typeof createProjectSchema>;
