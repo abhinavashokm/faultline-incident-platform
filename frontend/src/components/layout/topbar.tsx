@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useListProjects } from "@/features/projects/hooks";
 
 interface TopbarProps {
   workspaceSlug: string;
@@ -37,11 +38,24 @@ interface TopbarProps {
 
 export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: TopbarProps) {
   const router = useRouter();
-  const [selectedProject, setSelectedProject] = useState("payments-api");
+  const { data: projects, isLoading: projectsLoading } = useListProjects();
+  const [selectedProject, setSelectedProject] = useState<string>("");
   const [projectSelectOpen, setProjectSelectOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (projects && projects.length > 0) {
+      // If no project is selected or current selection is not in the list, select the first project
+      const exists = projects.some((p) => p.slug === selectedProject);
+      if (!selectedProject || !exists) {
+        setSelectedProject(projects[0].slug);
+      }
+    } else if (projects && projects.length === 0) {
+      setSelectedProject("");
+    }
+  }, [projects, selectedProject]);
 
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -80,12 +94,11 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
 
   const onNewProject = () => {
     setProjectSelectOpen(false);
-    console.log("TODO: open create-project modal");
+    router.push(`/${workspaceSlug}/projects/new`);
   };
 
   const onManageProjects = () => {
     setProjectSelectOpen(false);
-    router.push("/projects");
   };
 
   return (
@@ -128,10 +141,21 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="payments-api">Payments API</SelectItem>
-                <SelectItem value="auth-gateway">Auth Gateway</SelectItem>
-                <SelectItem value="billing-worker">Billing Worker</SelectItem>
-                <SelectItem value="processing-worker">Processing Worker</SelectItem>
+                {projectsLoading && (
+                  <div className="py-2 px-3 text-body-sm text-text-muted">
+                    Loading projects...
+                  </div>
+                )}
+                {!projectsLoading && (!projects || projects.length === 0) && (
+                  <div className="py-2 px-3 text-body-sm text-text-muted">
+                    No projects found
+                  </div>
+                )}
+                {projects?.map((project) => (
+                  <SelectItem key={project.id} value={project.slug}>
+                    {project.name}
+                  </SelectItem>
+                ))}
                 <SelectSeparator />
                 <button
                   type="button"
