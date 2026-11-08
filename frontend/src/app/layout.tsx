@@ -21,6 +21,9 @@ const robotoMono = Roboto_Mono({
 export const metadata: Metadata = {
   title: "Faultline",
   description: "Error tracking and incident response platform",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
