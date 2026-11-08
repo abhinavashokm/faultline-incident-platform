@@ -15,7 +15,7 @@ class ProjectCreateRequest(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=150)
     slug: str = Field(..., min_length=1, max_length=100)
-    platform: Literal["python", "fastapi", "django"] | None = None
+    platform: Literal["fastapi"] | None = None
     description: str | None = None
 
     @field_validator("slug")
