@@ -143,9 +143,6 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
           <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-canvas text-label-md font-medium text-text-primary">
             <Building2 className="h-3.5 w-3.5 text-primary" />
             <span className="font-semibold">{workspaceName}</span>
-            <span className="text-text-muted text-[10px] font-mono px-1 rounded bg-card border border-border">
-              prod
-            </span>
           </div>
 
           <span className="text-border hidden sm:inline">/</span>
