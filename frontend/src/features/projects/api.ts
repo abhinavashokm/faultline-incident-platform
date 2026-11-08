@@ -8,25 +8,25 @@ export async function listProjectsApi(): Promise<Project[]> {
 }
 
 export async function createProjectApi(data: CreateProjectFormData): Promise<Project> {
-  await delay(600);
-
-  return {
-    id: "proj_" + Math.random().toString(36).substring(2, 10),
+  const payload: {
+    name: string;
+    slug: string;
+    platform?: string;
+    description?: string;
+  } = {
     name: data.name,
     slug: data.slug,
-    description: data.description || null,
-    environment: data.environment || "production",
     platform: data.platform || "fastapi",
-    dsn: "https://fl_pub_9a82f1b4@ingest.faultline.io/42019",
-    apiKey: "fl_sec_9a82f1b4892cfa7eb40",
-    createdAt: new Date().toISOString(),
-    eventCount: 0,
   };
+
+  if (data.description && data.description.trim()) {
+    payload.description = data.description.trim();
+  }
+
+  return apiClient.post<Project>("/api/v1/projects", payload);
 }
 
 export async function getSdkConfigApi(): Promise<SdkConfig> {
-  await delay(200);
-
   return {
     name: DEFAULT_SDK.name,
     installCommand: DEFAULT_SDK.installCommand,

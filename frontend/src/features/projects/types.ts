@@ -3,12 +3,15 @@ export interface Project {
   name: string;
   slug: string;
   description?: string | null;
-  environment: string;
   platform?: string | null;
-  dsn: string;
-  apiKey: string;
-  createdAt: string;
-  eventCount: number;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+  dsn?: string;
+  environment?: string;
+  apiKey?: string;
+  createdAt?: string;
+  eventCount?: number;
 }
 
 export interface SdkConfig {

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,7 @@ import {
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AuthErrorAlert } from "@/features/auth/components/auth-error-alert";
 import {
   Form,
   FormControl,
@@ -38,6 +39,7 @@ const RUNTIME_PLATFORM_CONFIG = {
 
 export default function CreateProjectPage() {
   const router = useRouter();
+  const [formError, setFormError] = useState<string | null>(null);
 
   const form = useForm<CreateProjectFormData>({
     resolver: zodResolver(createProjectSchema),
@@ -66,6 +68,8 @@ export default function CreateProjectPage() {
   };
 
   function onSubmit(values: CreateProjectFormData) {
+    setFormError(null);
+
     createProject(values, {
       onSuccess: (project) => {
         router.push(
@@ -73,6 +77,22 @@ export default function CreateProjectPage() {
             project.name
           )}`
         );
+      },
+      onError: (err: any) => {
+        const errorMsg =
+          err.message || "Failed to create project. Please try again.";
+
+        if (err.status === 409 || /slug.*already exists/i.test(errorMsg)) {
+          form.setError("slug", {
+            type: "manual",
+            message: "A project with this slug already exists in this workspace",
+          });
+          setFormError(
+            "A project with this slug already exists in this workspace. Please choose a different slug."
+          );
+        } else {
+          setFormError(errorMsg);
+        }
       },
     });
   }
@@ -123,6 +143,8 @@ export default function CreateProjectPage() {
               Give your service a name and description. You can set up the SDK in the next step.
             </p>
           </div>
+
+          <AuthErrorAlert error={formError} />
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
