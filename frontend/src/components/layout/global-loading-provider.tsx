@@ -11,9 +11,11 @@ export function GlobalLoadingProvider({
 }) {
   const { isReady } = useAuth();
 
-  if (!isReady) {
-    return <GlobalLoadingScreen />;
-  }
-
-  return <>{children}</>;
+  return (
+    <>
+      {!isReady && <GlobalLoadingScreen />}
+      {children}
+    </>
+  );
 }
+
