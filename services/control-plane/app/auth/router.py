@@ -1,6 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Cookie,
+    Depends,
+    HTTPException,
+    Response,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import AuthContext, current_user
@@ -165,12 +173,28 @@ async def login(
     response_model=TokenResponse,
 )
 async def refresh(
-    payload: RefreshRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
+    response: Response,
+    refresh_token: Annotated[str | None, Cookie()] = None,
 ) -> TokenResponse:
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     service = AuthService(session)
     try:
-        return await service.refresh(payload)
+        tokens = await service.refresh(refresh_token)
+        response.set_cookie(
+            key="refresh_token",
+            value=tokens.refresh_token,
+            httponly=True,
+            secure=False,  # Can be true in production with HTTPS
+            samesite="lax",
+            path="/api/v1/auth",
+        )
+        return tokens
     except InvalidRefreshToken as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -184,11 +208,16 @@ async def refresh(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def logout(
-    payload: LogoutRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
+    response: Response,
+    refresh_token: Annotated[str | None, Cookie()] = None,
 ) -> None:
     service = AuthService(session)
-    await service.logout(payload)
+    await service.logout(refresh_token)
+    response.delete_cookie(
+        key="refresh_token",
+        path="/api/v1/auth",
+    )
 
 
 @router.get(

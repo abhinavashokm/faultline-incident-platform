@@ -312,19 +312,26 @@ async def test_refresh_token_rotation_and_old_token_invalidation(
     rt1 = login_resp.json()["refresh_token"]
 
     # Refresh
-    ref_resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt1})
+    ref_resp = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt1})
     assert ref_resp.status_code == 200
     data = ref_resp.json()
     assert "access_token" in data
     assert "refresh_token" in data
+    assert "refresh_token" in ref_resp.cookies
     rt2 = data["refresh_token"]
     assert rt2 != rt1
+    assert ref_resp.cookies["refresh_token"] == rt2
 
     # Old refresh token rt1 no longer works
-    ref_resp_old = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt1})
+    ref_resp_old = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt1})
     assert ref_resp_old.status_code == 401
     assert ref_resp_old.json()["detail"] == "Invalid refresh token"
     assert ref_resp_old.headers.get("www-authenticate") == "Bearer"
+
+    # Missing refresh token cookie fails with 401
+    ref_resp_missing = await client.post("/api/v1/auth/refresh")
+    assert ref_resp_missing.status_code == 401
+    assert ref_resp_missing.json()["detail"] == "Invalid refresh token"
 
 
 @pytest.mark.asyncio
@@ -346,17 +353,17 @@ async def test_refresh_token_reuse_revokes_session(
     rt1 = login_resp.json()["refresh_token"]
 
     # First refresh: rt1 -> rt2
-    ref_resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt1})
+    ref_resp = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt1})
     assert ref_resp.status_code == 200
     rt2 = ref_resp.json()["refresh_token"]
 
     # REUSE: Use rt1 again
-    reuse_resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt1})
+    reuse_resp = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt1})
     assert reuse_resp.status_code == 401
     assert reuse_resp.json()["detail"] == "Invalid refresh token"
 
     # Whole session must now be revoked, so newest token rt2 also fails
-    new_resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt2})
+    new_resp = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt2})
     assert new_resp.status_code == 401
     assert new_resp.json()["detail"] == "Invalid refresh token"
 
@@ -387,17 +394,19 @@ async def test_logout_revokes_session(
     rt = login_resp.json()["refresh_token"]
 
     # Logout
-    logout_resp = await client.post("/api/v1/auth/logout", json={"refresh_token": rt})
+    logout_resp = await client.post("/api/v1/auth/logout", cookies={"refresh_token": rt})
     assert logout_resp.status_code == 204
 
     # Idempotent logout with same or unknown token returns 204
-    logout_resp2 = await client.post("/api/v1/auth/logout", json={"refresh_token": rt})
+    logout_resp2 = await client.post("/api/v1/auth/logout", cookies={"refresh_token": rt})
     assert logout_resp2.status_code == 204
-    logout_resp3 = await client.post("/api/v1/auth/logout", json={"refresh_token": "unknown-token"})
+    logout_resp3 = await client.post("/api/v1/auth/logout", cookies={"refresh_token": "unknown-token"})
     assert logout_resp3.status_code == 204
+    logout_resp4 = await client.post("/api/v1/auth/logout")
+    assert logout_resp4.status_code == 204
 
     # Refresh after logout fails
-    ref_resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt})
+    ref_resp = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt})
     assert ref_resp.status_code == 401
     assert ref_resp.json()["detail"] == "Invalid refresh token"
 
@@ -431,7 +440,7 @@ async def test_expired_refresh_token_fails(
         t.expires_at = past
     await db_session.commit()
 
-    ref_resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt})
+    ref_resp = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt})
     assert ref_resp.status_code == 401
     assert ref_resp.json()["detail"] == "Invalid refresh token"
 
@@ -460,7 +469,7 @@ async def test_disabled_user_cannot_refresh(
     user.status = "suspended"
     await db_session.commit()
 
-    ref_resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt})
+    ref_resp = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt})
     assert ref_resp.status_code == 401
     assert ref_resp.json()["detail"] == "Invalid refresh token"
 
@@ -502,7 +511,7 @@ async def test_refresh_picks_up_changed_role(
     await db_session.commit()
 
     # Refresh
-    ref_resp = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt})
+    ref_resp = await client.post("/api/v1/auth/refresh", cookies={"refresh_token": rt})
     assert ref_resp.status_code == 200
     data = ref_resp.json()
     assert data["workspace"]["role"] == "admin"

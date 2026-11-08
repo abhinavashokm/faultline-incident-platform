@@ -231,8 +231,8 @@ class AuthService:
             logger.info("User logged in successfully: user_id=%s", user.id)
             return tokens
 
-    async def refresh(self, payload: RefreshRequest) -> TokenResponse:
-        token_hash = hash_refresh_token(payload.refresh_token)
+    async def refresh(self, refresh_token: str) -> TokenResponse:
+        token_hash = hash_refresh_token(refresh_token)
 
         if not self.session.in_transaction():
             await self.session.begin()
@@ -339,8 +339,10 @@ class AuthService:
             workspace=workspace_info,
         )
 
-    async def logout(self, payload: LogoutRequest) -> None:
-        token_hash = hash_refresh_token(payload.refresh_token)
+    async def logout(self, refresh_token: str | None) -> None:
+        if not refresh_token:
+            return
+        token_hash = hash_refresh_token(refresh_token)
         async with self.session.begin():
             token_data = await self.repository.get_refresh_token_by_hash(token_hash)
             if token_data is not None:
