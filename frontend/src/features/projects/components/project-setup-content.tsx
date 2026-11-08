@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Copy,
@@ -233,14 +232,7 @@ export function ProjectSetupContent({ project, workspaceSlug }: ProjectSetupCont
         </div>
 
         {/* Card Footer Actions */}
-        <div className="mt-8 pt-4 border-t border-border flex items-center justify-between">
-          <Link
-            href={`/${workspaceSlug}/projects/new`}
-            className="text-body-sm text-text-secondary hover:text-text-primary"
-          >
-            ← Create another project
-          </Link>
-
+        <div className="mt-8 pt-4 border-t border-border flex items-center justify-end">
           <Button onClick={handleFinish} className="gap-2">
             <span>Go to Overview Dashboard</span>
             <ArrowRight className="h-4 w-4" />
