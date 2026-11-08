@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useParams } from "next/navigation";
 import {
   Menu,
   Search,
@@ -38,16 +38,22 @@ interface TopbarProps {
 
 export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: TopbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const params = useParams();
+  const urlProjectSlug = params?.projectSlug as string | undefined;
+
   const { data: projects, isLoading: projectsLoading } = useListProjects();
-  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedProject, setSelectedProject] = useState<string>(urlProjectSlug || "");
   const [projectSelectOpen, setProjectSelectOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (projects && projects.length > 0) {
-      // If no project is selected or current selection is not in the list, select the first project
+    if (urlProjectSlug) {
+      setSelectedProject(urlProjectSlug);
+    } else if (projects && projects.length > 0) {
+      // If no project is in the URL and no project is selected (or selected one isn't in projects), select the first project
       const exists = projects.some((p) => p.slug === selectedProject);
       if (!selectedProject || !exists) {
         setSelectedProject(projects[0].slug);
@@ -55,7 +61,25 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
     } else if (projects && projects.length === 0) {
       setSelectedProject("");
     }
-  }, [projects, selectedProject]);
+  }, [projects, selectedProject, urlProjectSlug]);
+
+  const handleProjectChange = (newSlug: string) => {
+    setSelectedProject(newSlug);
+    if (!workspaceSlug) return;
+
+    if (urlProjectSlug) {
+      // Replace the projectSlug segment in the current URL path
+      const currentPrefix = `/${workspaceSlug}/${urlProjectSlug}`;
+      const newPrefix = `/${workspaceSlug}/${newSlug}`;
+      if (pathname.startsWith(currentPrefix)) {
+        const remainingPath = pathname.slice(currentPrefix.length);
+        router.push(`${newPrefix}${remainingPath}`);
+        return;
+      }
+    }
+    // Default fallback to overview of the selected project
+    router.push(`/${workspaceSlug}/${newSlug}/overview`);
+  };
 
   useEffect(() => {
     if (!userMenuOpen) return;
@@ -130,7 +154,7 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
           <div className="w-36 sm:w-44">
             <Select
               value={selectedProject}
-              onValueChange={setSelectedProject}
+              onValueChange={handleProjectChange}
               open={projectSelectOpen}
               onOpenChange={setProjectSelectOpen}
             >

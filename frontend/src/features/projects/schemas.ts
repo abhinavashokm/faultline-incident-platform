@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isReservedProjectSlug } from "./constants";
 
 export const createProjectSchema = z.object({
   name: z
@@ -8,7 +9,10 @@ export const createProjectSchema = z.object({
   slug: z
     .string()
     .min(2, "Slug must be at least 2 characters")
-    .regex(/^[a-z0-9-]+$/, "Slug must only contain lowercase letters, numbers, and hyphens"),
+    .regex(/^[a-z0-9-]+$/, "Slug must only contain lowercase letters, numbers, and hyphens")
+    .refine((slug) => !isReservedProjectSlug(slug), {
+      message: "This slug is reserved and cannot be used as a project identifier",
+    }),
   description: z.string().optional(),
   environment: z.string().optional().default("production"),
   platform: z.string().optional().default("fastapi"),

@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   AlertOctagon,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
+import { useListProjects } from "@/features/projects/hooks";
 
 interface NavItem {
   name: string;
@@ -38,40 +39,49 @@ export function Sidebar({
   onMobileClose,
 }: SidebarProps) {
   const pathname = usePathname();
+  const params = useParams();
+  const { data: projects } = useListProjects();
+
+  const currentProjectSlug =
+    (params?.projectSlug as string) || (projects && projects[0]?.slug) || "";
+
+  const basePrefix = currentProjectSlug
+    ? `/${workspaceSlug}/${currentProjectSlug}`
+    : `/${workspaceSlug}`;
 
   const navItems: NavItem[] = [
     {
       name: "Overview",
-      href: `/${workspaceSlug}/overview`,
+      href: `${basePrefix}/overview`,
       icon: LayoutDashboard,
     },
     {
       name: "Issues",
-      href: `/${workspaceSlug}/issues`,
+      href: `${basePrefix}/issues`,
       icon: AlertOctagon,
       badge: "14",
       badgeVariant: "warning",
     },
     {
       name: "Performance",
-      href: `/${workspaceSlug}/performance`,
+      href: `${basePrefix}/performance`,
       icon: Gauge,
     },
     {
       name: "Alerts",
-      href: `/${workspaceSlug}/alerts`,
+      href: `${basePrefix}/alerts`,
       icon: Bell,
     },
     {
       name: "Incidents",
-      href: `/${workspaceSlug}/incidents`,
+      href: `${basePrefix}/incidents`,
       icon: Flame,
       badge: "2",
       badgeVariant: "error",
     },
     {
       name: "Investigations",
-      href: `/${workspaceSlug}/investigations`,
+      href: `${basePrefix}/investigations`,
       icon: SearchCode,
       badge: "AI",
     },
@@ -104,7 +114,7 @@ export function Sidebar({
         {/* Brand Header */}
         <div className="flex h-14 items-center justify-between px-3.5 border-b border-border">
           <Link
-            href={`/${workspaceSlug}/overview`}
+            href={`${basePrefix}/overview`}
             className="flex items-center gap-2.5 overflow-hidden"
           >
             {/* Expanded on mobile and desktop, mark only on tablet */}

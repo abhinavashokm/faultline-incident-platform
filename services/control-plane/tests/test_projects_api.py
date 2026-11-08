@@ -132,6 +132,19 @@ async def test_create_project_validation_errors(
         "trailing-hyphen-",
         "double--hyphen",
         "",
+        "overview",
+        "issues",
+        "projects",
+        "settings",
+        "alerts",
+        "incidents",
+        "investigations",
+        "performance",
+        "members",
+        "billing",
+        "api",
+        "auth",
+        "new",
     ]
     for bad_slug in bad_slugs:
         resp = await client.post(

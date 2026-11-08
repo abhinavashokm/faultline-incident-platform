@@ -9,6 +9,24 @@ from app.core.config import settings
 
 SLUG_REGEX = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
+RESERVED_PROJECT_SLUGS: frozenset[str] = frozenset(
+    {
+        "overview",
+        "issues",
+        "projects",
+        "settings",
+        "alerts",
+        "incidents",
+        "investigations",
+        "performance",
+        "members",
+        "billing",
+        "api",
+        "auth",
+        "new",
+    }
+)
+
 
 class ProjectCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -23,6 +41,8 @@ class ProjectCreateRequest(BaseModel):
     def validate_slug(cls, v: str) -> str:
         if not SLUG_REGEX.match(v):
             raise ValueError("Invalid slug format. Must match ^[a-z0-9]+(-[a-z0-9]+)*$")
+        if v in RESERVED_PROJECT_SLUGS:
+            raise ValueError(f"Project slug '{v}' is reserved and cannot be used")
         return v
 
 
