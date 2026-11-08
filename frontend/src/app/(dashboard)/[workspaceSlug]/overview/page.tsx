@@ -162,7 +162,7 @@ export default function OverviewPage() {
           </Button>
 
           <Button asChild size="sm" className="gap-1.5">
-            <Link href="/onboarding/install-sdk">
+            <Link href={`/${workspaceSlug}/projects/new`}>
               <Terminal className="h-3.5 w-3.5" />
               <span>Connect SDK</span>
             </Link>
@@ -254,8 +254,8 @@ export default function OverviewPage() {
               </p>
               <div className="flex items-center justify-center gap-3">
                 <Button asChild className="gap-2">
-                  <Link href="/onboarding/install-sdk">
-                    <span>Install SDK</span>
+                  <Link href={`/${workspaceSlug}/projects/new`}>
+                    <span>Create Project</span>
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -522,7 +522,7 @@ export default function OverviewPage() {
                     </p>
                   </div>
                   <Button variant="secondary" size="sm" asChild>
-                    <Link href="/onboarding/create-project">Add Service</Link>
+                    <Link href={`/${workspaceSlug}/projects/new`}>Add Service</Link>
                   </Button>
                 </div>
 

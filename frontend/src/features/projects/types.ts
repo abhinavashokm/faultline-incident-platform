@@ -14,6 +14,14 @@ export interface Project {
   eventCount?: number;
 }
 
+export interface ProjectApiKeyResponse {
+  id: string;
+  key_type: "ingest" | "release";
+  dsn: string;
+  last_used_at?: string | null;
+  created_at: string;
+}
+
 export interface SdkConfig {
   name: string;
   installCommand: string;

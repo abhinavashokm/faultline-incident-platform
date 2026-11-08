@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, AlertCircle, ArrowRight, Loader2, Info } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Loader2, Info } from "lucide-react";
 
 import { AuthShell } from "@/components/layout/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Form,
@@ -57,7 +56,7 @@ export default function LoginPage() {
         try {
           const projects = await listProjectsApi();
           if (projects.length === 0) {
-            router.push("/onboarding/create-project");
+            router.push(`/${slug}/projects/new`);
           } else {
             router.push(`/${slug}/overview`);
           }
@@ -72,7 +71,6 @@ export default function LoginPage() {
           router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
           return;
         }
-        console.log(err.message)
         setFormError(
           err.message || "Invalid credentials. Please verify your email and password."
         );
@@ -215,4 +213,3 @@ export default function LoginPage() {
     </AuthShell>
   );
 }
-

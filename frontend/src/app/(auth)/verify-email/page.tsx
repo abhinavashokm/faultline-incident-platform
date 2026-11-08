@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Mail, ArrowLeft, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Mail, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
 
 import { AuthShell } from "@/components/layout/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useVerifyEmail, useResendOtp } from "@/features/auth/hooks";
 import { AuthErrorAlert } from "@/features/auth/components/auth-error-alert";
 import { useAuth } from "@/features/auth/auth-context";
+import { listProjectsApi } from "@/features/projects/api";
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -108,12 +109,20 @@ function VerifyEmailContent() {
     verifyOtp(
       { code },
       {
-        onSuccess: () => {
+        onSuccess: async (data) => {
           onLoginSuccess();
-          setSuccessMsg("Email successfully verified! Redirecting to project onboarding...");
-          setTimeout(() => {
-            router.push("/onboarding/create-project");
-          }, 800);
+          setSuccessMsg("Email successfully verified! Redirecting...");
+          const slug = data.workspace?.slug || "overview";
+          try {
+            const projects = await listProjectsApi();
+            if (!projects || projects.length === 0) {
+              router.push(`/${slug}/projects/new`);
+            } else {
+              router.push(`/${slug}/overview`);
+            }
+          } catch {
+            router.push(`/${slug}/overview`);
+          }
         },
         onError: (err: any) => {
           setFormError(

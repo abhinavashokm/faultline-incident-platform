@@ -1,7 +1,6 @@
 import { apiClient, delay } from "@/lib/api-client";
 import { CreateProjectFormData } from "./schemas";
-import { Project, SdkConfig, LiveStatusEvent } from "./types";
-import { DEFAULT_SDK } from "./sdk-config";
+import { Project, ProjectApiKeyResponse, LiveStatusEvent } from "./types";
 
 export async function listProjectsApi(): Promise<Project[]> {
   return apiClient.get<Project[]>("/api/v1/projects");
@@ -26,15 +25,8 @@ export async function createProjectApi(data: CreateProjectFormData): Promise<Pro
   return apiClient.post<Project>("/api/v1/projects", payload);
 }
 
-export async function getSdkConfigApi(): Promise<SdkConfig> {
-  return {
-    name: DEFAULT_SDK.name,
-    installCommand: DEFAULT_SDK.installCommand,
-    initSnippet: DEFAULT_SDK.initSnippet,
-    envSnippet: DEFAULT_SDK.envSnippet,
-    dsn: "https://fl_pub_9a82f1b4@ingest.faultline.io/42019",
-    apiKey: "fl_sec_9a82f1b4892cfa7eb40",
-  };
+export async function getProjectApiKeyApi(projectId: string): Promise<ProjectApiKeyResponse> {
+  return apiClient.get<ProjectApiKeyResponse>(`/api/v1/projects/${projectId}/api-key`);
 }
 
 export async function checkFirstEventStatusApi(
