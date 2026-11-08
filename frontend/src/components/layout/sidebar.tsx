@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  FolderKanban,
   AlertOctagon,
   Gauge,
   Bell,
@@ -45,11 +44,6 @@ export function Sidebar({
       name: "Overview",
       href: `/${workspaceSlug}/overview`,
       icon: LayoutDashboard,
-    },
-    {
-      name: "Projects",
-      href: `/${workspaceSlug}/projects`,
-      icon: FolderKanban,
     },
     {
       name: "Issues",
@@ -207,4 +201,3 @@ export function Sidebar({
     </>
   );
 }
-

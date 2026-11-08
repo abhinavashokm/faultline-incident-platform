@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -9,6 +9,8 @@ import {
   ChevronDown,
   Building2,
   FolderOpen,
+  FolderKanban,
+  Plus,
   User,
   LogOut,
   Settings,
@@ -22,6 +24,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -34,9 +37,35 @@ interface TopbarProps {
 
 export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: TopbarProps) {
   const router = useRouter();
-  const [selectedProject, setSelectedProject] = useState("all");
+  const [selectedProject, setSelectedProject] = useState("payments-api");
+  const [projectSelectOpen, setProjectSelectOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setUserMenuOpen(false);
+      }
+    };
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleMouseDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleMouseDown);
+    };
+  }, [userMenuOpen]);
 
   const toggleDarkMode = () => {
     if (typeof document !== "undefined") {
@@ -47,6 +76,16 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
 
   const handleLogout = () => {
     router.push("/login");
+  };
+
+  const onNewProject = () => {
+    setProjectSelectOpen(false);
+    console.log("TODO: open create-project modal");
+  };
+
+  const onManageProjects = () => {
+    setProjectSelectOpen(false);
+    router.push("/projects");
   };
 
   return (
@@ -76,7 +115,12 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
 
           {/* Project Selector */}
           <div className="w-36 sm:w-44">
-            <Select value={selectedProject} onValueChange={setSelectedProject}>
+            <Select
+              value={selectedProject}
+              onValueChange={setSelectedProject}
+              open={projectSelectOpen}
+              onOpenChange={setProjectSelectOpen}
+            >
               <SelectTrigger className="h-8 text-label-md bg-canvas">
                 <div className="flex items-center gap-1.5 truncate">
                   <FolderOpen className="h-3.5 w-3.5 text-text-muted shrink-0" />
@@ -84,11 +128,27 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
                 </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Projects (4)</SelectItem>
                 <SelectItem value="payments-api">Payments API</SelectItem>
                 <SelectItem value="auth-gateway">Auth Gateway</SelectItem>
                 <SelectItem value="billing-worker">Billing Worker</SelectItem>
                 <SelectItem value="processing-worker">Processing Worker</SelectItem>
+                <SelectSeparator />
+                <button
+                  type="button"
+                  onClick={onNewProject}
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-body-sm text-text-secondary outline-none hover:bg-canvas hover:text-text-primary transition-colors"
+                >
+                  <Plus className="mr-2 h-4 w-4 text-text-muted shrink-0" />
+                  <span>New project</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onManageProjects}
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-body-sm text-text-secondary outline-none hover:bg-canvas hover:text-text-primary transition-colors"
+                >
+                  <FolderKanban className="mr-2 h-4 w-4 text-text-muted shrink-0" />
+                  <span>Manage projects</span>
+                </button>
               </SelectContent>
             </Select>
           </div>
@@ -132,7 +192,7 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
         </button>
 
         {/* User Menu Dropdown Trigger */}
-        <div className="relative">
+        <div className="relative" ref={userMenuRef}>
           <button
             type="button"
             onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -168,11 +228,18 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
                 </p>
                 <div className="mt-1 flex items-center gap-1 text-[10px] text-success">
                   <ShieldCheck className="h-3 w-3" />
-                  <span>Workspace Admin</span>
+                  <span>Owner</span>
                 </div>
               </div>
 
               <div className="py-1">
+                <Link
+                  href="/projects"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded text-body-sm text-text-secondary hover:bg-canvas hover:text-text-primary"
+                >
+                  <FolderKanban className="h-4 w-4 text-text-muted" />
+                  <span>Manage Projects</span>
+                </Link>
                 <Link
                   href={`/${workspaceSlug}/settings`}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded text-body-sm text-text-secondary hover:bg-canvas hover:text-text-primary"
@@ -206,4 +273,3 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
     </header>
   );
 }
-
