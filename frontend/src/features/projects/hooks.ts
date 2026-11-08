@@ -22,14 +22,20 @@ export function useListProjects() {
 }
 
 export function useProjectBySlug(slug: string) {
-  const { data: projects, isLoading, isError, error } = useListProjects();
+  const { isReady, isAuthenticated } = useAuth();
+  const { data: projects, isLoading: isQueryLoading, isFetched, isError, error } = useListProjects();
 
   const project = useMemo(() => {
     if (!projects) return undefined;
     return projects.find((p) => p.slug === slug);
   }, [projects, slug]);
 
-  const isNotFound = !isLoading && Boolean(projects) && !project;
+  // Loading is true while auth bootstrap is pending OR when projects are actively loading
+  // OR when authenticated and the projects query hasn't finished fetching yet.
+  const isLoading = !isReady || isQueryLoading || (isAuthenticated && !isFetched);
+
+  // Strictly only not found if auth is settled, authenticated, projects query has fetched, and matching completed
+  const isNotFound = isReady && isAuthenticated && isFetched && !isLoading && !project;
 
   return {
     project,

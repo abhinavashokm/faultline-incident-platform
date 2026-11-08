@@ -14,7 +14,7 @@ export default function ProjectSetupPage() {
 
   const { project, isLoading, isNotFound, isArchived } = useProjectBySlug(projectSlug);
 
-  if (isLoading) {
+  if (isLoading || (!project && !isNotFound)) {
     return (
       <div className="py-20 flex flex-col items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />

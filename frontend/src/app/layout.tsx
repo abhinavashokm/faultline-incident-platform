@@ -3,6 +3,7 @@ import { Rubik, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/lib/query-provider";
 import { AuthProvider } from "@/features/auth/auth-context";
+import { GlobalLoadingProvider } from "@/components/layout/global-loading-provider";
 import { Toaster } from "@/components/ui/toaster";
 
 const rubik = Rubik({
@@ -32,8 +33,10 @@ export default function RootLayout({
       <body className="min-h-screen bg-canvas font-sans text-text-primary antialiased">
         <QueryProvider>
           <AuthProvider>
-            {children}
-            <Toaster />
+            <GlobalLoadingProvider>
+              {children}
+              <Toaster />
+            </GlobalLoadingProvider>
           </AuthProvider>
         </QueryProvider>
       </body>
