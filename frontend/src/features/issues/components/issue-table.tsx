@@ -85,7 +85,6 @@ export function IssueTable({
                 />
               </th>
               <th className="py-2 px-3 font-medium">Issue &amp; Root Cause Culprit</th>
-              <th className="py-2 px-3 font-medium">Environment</th>
               <th className="py-2 px-3 font-medium text-right">Events</th>
               <th className="py-2 px-3 font-medium text-right">Users</th>
               <th className="py-2 px-3 font-medium">First Seen</th>
@@ -136,13 +135,6 @@ export function IssueTable({
                     <div className="font-mono text-[11px] text-text-muted truncate max-w-lg mt-0.5">
                       {issue.culprit}
                     </div>
-                  </td>
-
-                  {/* Environment chip */}
-                  <td className="py-2 px-3">
-                    <span className="font-mono text-[11px] px-2 py-0.5 rounded-full bg-canvas border border-border text-text-secondary">
-                      {issue.environment}
-                    </span>
                   </td>
 
                   {/* Events (Mono tabular) */}

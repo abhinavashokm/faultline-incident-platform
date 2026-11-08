@@ -28,7 +28,6 @@ export default function IssuesListPage() {
 
   const [filters, setFilters] = useState<IssueFilterParams>({
     status: "unresolved",
-    environment: "all",
     timeRange: "24h",
     search: "",
     limit: 25,
@@ -165,7 +164,7 @@ export default function IssuesListPage() {
               <p className="text-body-sm text-text-secondary max-w-sm mx-auto mt-1 mb-5">
                 {filters.search
                   ? `No issues matching "${filters.search}". Try adjusting your search query or filters.`
-                  : `There are currently no ${filters.status} issues in this environment.`}
+                  : `There are currently no ${filters.status} issues.`}
               </p>
               {filters.search && (
                 <Button

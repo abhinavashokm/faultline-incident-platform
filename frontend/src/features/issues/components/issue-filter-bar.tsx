@@ -54,26 +54,8 @@ export function IssueFilterBar({
         })}
       </div>
 
-      {/* Right: Environment, Time Range & Search */}
+      {/* Right: Time Range & Search */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Environment Filter */}
-        <div className="w-32">
-          <Select
-            value={filters.environment || "all"}
-            onValueChange={(val) => onFilterChange({ environment: val })}
-          >
-            <SelectTrigger className="h-8 text-label-md bg-canvas">
-              <SelectValue placeholder="Environment" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Envs</SelectItem>
-              <SelectItem value="production">production</SelectItem>
-              <SelectItem value="staging">staging</SelectItem>
-              <SelectItem value="development">development</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         {/* Time Range Filter */}
         <div className="w-28">
           <Select
