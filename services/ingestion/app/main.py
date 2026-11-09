@@ -41,6 +41,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     kafka_producer = AIOKafkaProducerAdapter(
         bootstrap_servers=settings.kafka_bootstrap_servers,
         timeout_seconds=settings.kafka_producer_timeout_seconds,
+        connect_timeout_seconds=settings.kafka_connect_timeout_seconds,
+        reconnect_cooldown_seconds=settings.kafka_reconnect_cooldown_seconds,
         compression_type=settings.kafka_compression_type,
     )
 

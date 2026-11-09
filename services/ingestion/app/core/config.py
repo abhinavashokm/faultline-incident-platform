@@ -16,6 +16,14 @@ class Settings(BaseSettings):
         default=3.0,
         description="Timeout in seconds for Kafka acknowledgment",
     )
+    kafka_connect_timeout_seconds: float = Field(
+        default=2.0,
+        description="Timeout in seconds for Kafka producer start/bootstrap",
+    )
+    kafka_reconnect_cooldown_seconds: float = Field(
+        default=3.0,
+        description="Minimum seconds to wait before attempting to reconnect to Kafka",
+    )
     kafka_compression_type: str = Field(
         default="gzip",
         description="Compression algorithm for Kafka producer (gzip, none)",

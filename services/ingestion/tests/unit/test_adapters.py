@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -304,3 +305,147 @@ def test_ingestion_settings_fails_without_service_token(monkeypatch):
     monkeypatch.delenv("SERVICE_TOKEN", raising=False)
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+@pytest.mark.asyncio
+async def test_aiokafka_producer_adapter_lazy_start_on_publish():
+    from app.adapters.kafka import AIOKafkaProducerAdapter, ProducerState
+
+    adapter = AIOKafkaProducerAdapter(
+        bootstrap_servers="mock:9092",
+        timeout_seconds=1.0,
+        connect_timeout_seconds=1.0,
+        reconnect_cooldown_seconds=1.0,
+    )
+    assert adapter._state == ProducerState.STOPPED
+
+    mock_producer = AsyncMock()
+    mock_producer.start = AsyncMock()
+    mock_producer.send_and_wait = AsyncMock()
+
+    with patch("app.adapters.kafka.AIOKafkaProducer", return_value=mock_producer):
+        await adapter.publish("test-topic", b"key", b"value")
+
+    assert adapter._state == ProducerState.RUNNING
+    mock_producer.start.assert_called_once()
+    mock_producer.send_and_wait.assert_called_once_with("test-topic", value=b"value", key=b"key")
+    assert await adapter.is_healthy() is True
+
+    await adapter.stop()
+    assert adapter._state == ProducerState.STOPPED
+    mock_producer.stop.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_aiokafka_producer_adapter_failed_start_cooldown_and_recovery():
+    import time
+    from app.adapters.kafka import AIOKafkaProducerAdapter, KafkaPublishError, ProducerState
+
+    adapter = AIOKafkaProducerAdapter(
+        bootstrap_servers="mock:9092",
+        timeout_seconds=0.5,
+        connect_timeout_seconds=0.5,
+        reconnect_cooldown_seconds=0.2,
+    )
+
+    mock_failing_producer = AsyncMock()
+    mock_failing_producer.start = AsyncMock(side_effect=ConnectionError("Cannot reach Kafka"))
+    mock_failing_producer.stop = AsyncMock()
+
+    with patch("app.adapters.kafka.AIOKafkaProducer", return_value=mock_failing_producer):
+        with pytest.raises(KafkaPublishError) as exc_info:
+            await adapter.publish("test-topic", b"key", b"val")
+        assert "Kafka producer failed to start" in str(exc_info.value)
+        assert adapter._state == ProducerState.FAILED
+        assert await adapter.is_healthy() is False
+
+        # Attempting again immediately hits cooldown without calling AIOKafkaProducer
+        with pytest.raises(KafkaPublishError) as exc_info_cooldown:
+            await adapter.publish("test-topic", b"key", b"val")
+        assert "cooldown active" in str(exc_info_cooldown.value)
+
+    # After cooldown expires, connection recovers
+    await asyncio.sleep(0.25)
+
+    mock_healthy_producer = AsyncMock()
+    mock_healthy_producer.start = AsyncMock()
+    mock_healthy_producer.send_and_wait = AsyncMock()
+
+    with patch("app.adapters.kafka.AIOKafkaProducer", return_value=mock_healthy_producer):
+        await adapter.publish("test-topic", b"key", b"val")
+        assert adapter._state == ProducerState.RUNNING
+        assert await adapter.is_healthy() is True
+
+
+@pytest.mark.asyncio
+async def test_aiokafka_producer_adapter_concurrent_start():
+    from app.adapters.kafka import AIOKafkaProducerAdapter, ProducerState
+
+    adapter = AIOKafkaProducerAdapter(
+        bootstrap_servers="mock:9092",
+        timeout_seconds=1.0,
+        connect_timeout_seconds=1.0,
+    )
+
+    start_calls = 0
+
+    async def mock_start():
+        nonlocal start_calls
+        start_calls += 1
+        await asyncio.sleep(0.05)
+
+    mock_producer = AsyncMock()
+    mock_producer.start = AsyncMock(side_effect=mock_start)
+    mock_producer.send_and_wait = AsyncMock()
+
+    with patch("app.adapters.kafka.AIOKafkaProducer", return_value=mock_producer):
+        # Fire 5 concurrent publishes
+        results = await asyncio.gather(
+            adapter.publish("t", b"k1", b"v1"),
+            adapter.publish("t", b"k2", b"v2"),
+            adapter.publish("t", b"k3", b"v3"),
+            adapter.publish("t", b"k4", b"v4"),
+            adapter.publish("t", b"k5", b"v5"),
+        )
+
+    assert start_calls == 1
+    assert adapter._state == ProducerState.RUNNING
+    assert mock_producer.send_and_wait.call_count == 5
+
+
+@pytest.mark.asyncio
+async def test_aiokafka_producer_adapter_mid_run_failure():
+    from app.adapters.kafka import AIOKafkaProducerAdapter, KafkaPublishError, ProducerState
+
+    adapter = AIOKafkaProducerAdapter(
+        bootstrap_servers="mock:9092",
+        timeout_seconds=0.5,
+        connect_timeout_seconds=0.5,
+        reconnect_cooldown_seconds=0.1,
+    )
+
+    mock_producer = AsyncMock()
+    mock_producer.start = AsyncMock()
+    mock_producer.send_and_wait = AsyncMock(side_effect=ConnectionResetError("Broker dropped"))
+
+    with patch("app.adapters.kafka.AIOKafkaProducer", return_value=mock_producer):
+        await adapter.start()
+        assert adapter._state == ProducerState.RUNNING
+
+        with pytest.raises(KafkaPublishError) as exc_info:
+            await adapter.publish("topic", b"k", b"v")
+        assert "Kafka publish failed" in str(exc_info.value)
+        assert adapter._state == ProducerState.FAILED
+        assert await adapter.is_healthy() is False
+
+
+@pytest.mark.asyncio
+async def test_aiokafka_producer_adapter_stop_when_never_started():
+    from app.adapters.kafka import AIOKafkaProducerAdapter, ProducerState
+
+    adapter = AIOKafkaProducerAdapter(bootstrap_servers="mock:9092")
+    assert adapter._state == ProducerState.STOPPED
+    # Should not raise
+    await adapter.stop()
+    assert adapter._state == ProducerState.STOPPED
+
