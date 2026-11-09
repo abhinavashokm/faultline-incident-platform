@@ -1,11 +1,18 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useInfiniteQuery,
+} from "@tanstack/react-query";
 import {
   listIssuesApi,
   getIssueDetailApi,
+  listIssueEventsApi,
+  getEventDetailApi,
   updateIssueStatusApi,
   bulkUpdateIssueStatusApi,
 } from "./api";
-import { IssueFilterParams, IssueStatus } from "./types";
+import { IssueFilterParams, IssueStatus, EventListResponse, EventDetail } from "./types";
 
 export function useIssuesList(
   projectId?: string,
@@ -23,6 +30,40 @@ export function useIssueDetail(projectId?: string, issueId?: string) {
     queryKey: ["issue-detail", projectId, issueId],
     queryFn: () => getIssueDetailApi(projectId!, issueId!),
     enabled: Boolean(projectId && issueId),
+  });
+}
+
+export function useIssueEventsList(
+  projectId?: string,
+  issueId?: string,
+  limit: number = 25
+) {
+  return useInfiniteQuery<EventListResponse>({
+    queryKey: ["issue-events", projectId, issueId, limit],
+    queryFn: ({ pageParam }) =>
+      listIssueEventsApi(projectId!, issueId!, {
+        limit,
+        cursor: pageParam as string | undefined,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.meta.hasMore && lastPage.meta.nextCursor
+        ? lastPage.meta.nextCursor
+        : undefined,
+    enabled: Boolean(projectId && issueId),
+  });
+}
+
+export function useEventDetail(
+  projectId?: string,
+  issueId?: string,
+  eventId?: string | null
+) {
+  return useQuery<EventDetail>({
+    queryKey: ["event-detail", projectId, issueId, eventId],
+    queryFn: () => getEventDetailApi(projectId!, issueId!, eventId!),
+    enabled: Boolean(projectId && issueId && eventId),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

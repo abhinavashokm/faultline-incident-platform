@@ -1,5 +1,7 @@
 export type IssueStatus = "unresolved" | "resolved" | "ignored";
 export type IssueLevel = "error" | "warning" | "info" | "fatal";
+export type EventLevel = "error" | "warning" | "fatal";
+export type EventType = "error" | "message";
 
 export interface IssueListItem {
   id: string;
@@ -20,7 +22,7 @@ export interface IssueListItem {
 
 export interface StackFrame {
   file: string;
-  line: number;
+  line?: number | null;
   function: string;
   inApp: boolean;
   contextLines?: {
@@ -30,39 +32,39 @@ export interface StackFrame {
   }[];
 }
 
-export interface Breadcrumb {
-  timestamp: string;
-  category: "http" | "db" | "log" | "auth" | "navigation";
-  message: string;
-  level?: "info" | "warning" | "error";
-  data?: Record<string, unknown>;
-}
-
-export interface EventDetail {
+export interface EventListItem {
   id: string;
   issueId: string;
   occurredAt: string;
   receivedAt: string;
-  level: IssueLevel;
-  exceptionType: string;
-  message: string;
-  environment: string;
-  release: string;
+  level: EventLevel;
+  exceptionType?: string | null;
+  message?: string | null;
+  environment?: string | null;
+  release?: string | null;
+  eventType: EventType;
+}
+
+export interface EventDetail extends EventListItem {
   fingerprint: string;
-  stackFrames: StackFrame[];
-  breadcrumbs: Breadcrumb[];
-  tags: Record<string, string>;
-  user?: {
-    id: string;
-    ipAddress: string;
-    email?: string;
-  };
-  request?: {
-    method: string;
-    url: string;
-    statusCode?: number;
-    headers?: Record<string, string>;
-  };
+  stackFrames?: StackFrame[] | null;
+  service?: string | null;
+  routeTemplate?: string | null;
+  httpMethod?: string | null;
+  statusCode?: number | null;
+  userHash?: string | null;
+  context?: Record<string, unknown> | null;
+}
+
+export interface EventPaginationMeta {
+  limit: number;
+  hasMore: boolean;
+  nextCursor?: string | null;
+}
+
+export interface EventListResponse {
+  items: EventListItem[];
+  meta: EventPaginationMeta;
 }
 
 export interface InvestigationResult {
@@ -82,7 +84,6 @@ export interface IssueDetail extends IssueListItem {
   resolvedInRelease?: string | null;
   createdAt: string;
   updatedAt: string;
-  // Note: Event details and navigation will be populated in subsequent tasks
   latestEvent?: EventDetail;
   totalEvents?: number;
 }

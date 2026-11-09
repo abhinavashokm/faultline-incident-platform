@@ -23,8 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { StackTraceViewer } from "@/features/issues/components/stack-trace-viewer";
-import { BreadcrumbsPanel } from "@/features/issues/components/breadcrumbs-panel";
+import { EventSection } from "@/features/issues/components/event-section";
 import { useIssueDetail, useUpdateIssueStatus } from "@/features/issues/hooks";
 import { useProjectBySlug } from "@/features/projects/hooks";
 import { ProjectNotFound } from "@/features/projects/components/project-not-found";
@@ -43,7 +42,6 @@ export default function IssueDetailPage() {
   } = useProjectBySlug(projectSlug);
 
   const [copiedFingerprint, setCopiedFingerprint] = useState(false);
-  const [currentEventIndex, setCurrentEventIndex] = useState(1);
 
   const { data: issue, isLoading: isIssueLoading, isError, error, refetch, isFetching } = useIssueDetail(
     project?.id,
@@ -324,57 +322,9 @@ export default function IssueDetailPage() {
         </div>
       </div>
 
-      {/* Event Navigation Bar */}
-      {issue.latestEvent && (
-        <div className="rounded-lg border border-border bg-card p-3 shadow-level-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-label-md">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-text-primary">Viewing Event:</span>
-            <span className="font-mono text-text-secondary">
-              #{currentEventIndex} of {(issue.totalEvents ?? issue.occurrenceCount).toLocaleString()} (Latest)
-            </span>
-            <span className="text-border">•</span>
-            <span className="font-mono text-[11px] text-text-muted truncate">
-              ID: {issue.latestEvent.id}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 self-end sm:self-auto">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={currentEventIndex <= 1}
-              onClick={() => setCurrentEventIndex((prev) => Math.max(1, prev - 1))}
-              className="h-7 text-label-sm gap-1"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              <span>Older</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled
-              className="h-7 text-label-sm gap-1"
-            >
-              <span>Newer</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Stack Trace Viewer (per DESIGN.md spec) */}
-      {issue.latestEvent?.stackFrames && (
-        <StackTraceViewer frames={issue.latestEvent.stackFrames} />
-      )}
-
-      {/* Tags & Context Panel */}
-      {issue.latestEvent && (
-        <BreadcrumbsPanel
-          tags={issue.latestEvent.tags}
-          user={issue.latestEvent.user}
-          request={issue.latestEvent.request}
-        />
+      {/* Events Section: List + Selected Event Detail */}
+      {project?.id && (
+        <EventSection projectId={project.id} issueId={issue.id} />
       )}
     </div>
   );

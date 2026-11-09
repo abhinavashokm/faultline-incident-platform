@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import {
+  EventDetail,
+  EventListResponse,
   IssueDetail,
   IssueListResponse,
   IssueFilterParams,
@@ -32,6 +34,35 @@ export async function getIssueDetailApi(
   issueId: string
 ): Promise<IssueDetail> {
   return apiClient.get<IssueDetail>(`/api/v1/projects/${projectId}/issues/${issueId}`);
+}
+
+export async function listIssueEventsApi(
+  projectId: string,
+  issueId: string,
+  options: { limit?: number; cursor?: string } = {}
+): Promise<EventListResponse> {
+  const params: Record<string, string | number | undefined> = {};
+  if (options.limit) {
+    params.limit = options.limit;
+  }
+  if (options.cursor) {
+    params.cursor = options.cursor;
+  }
+
+  return apiClient.get<EventListResponse>(
+    `/api/v1/projects/${projectId}/issues/${issueId}/events`,
+    { params }
+  );
+}
+
+export async function getEventDetailApi(
+  projectId: string,
+  issueId: string,
+  eventId: string
+): Promise<EventDetail> {
+  return apiClient.get<EventDetail>(
+    `/api/v1/projects/${projectId}/issues/${issueId}/events/${eventId}`
+  );
 }
 
 export async function updateIssueStatusApi(
