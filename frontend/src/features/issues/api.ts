@@ -277,10 +277,12 @@ export async function getIssueDetailApi(
 ): Promise<IssueDetail> {
   await delay(450);
 
-  const found = mockIssuesData.find((i) => i.id === issueId);
-  if (!found) {
-    throw new ApiError(404, `Issue with ID ${issueId} not found`);
-  }
+  // Use matching mock item if found, otherwise fall back to sample mock item
+  const found =
+    mockIssuesData.find((i) => i.id === issueId) || {
+      ...mockIssuesData[0],
+      id: issueId,
+    };
 
   const eventDetail =
     mockDetailedEvents[issueId] || {
@@ -298,7 +300,7 @@ export async function getIssueDetailApi(
     fingerprint: eventDetail.fingerprint,
     totalEvents: found.occurrenceCount,
     latestEvent: eventDetail,
-    investigation: issueId === "77777777-7777-4777-8777-777777777777" ? mockInvestigation : undefined,
+    investigation: mockInvestigation,
     eventsTimeline: [
       { time: "09:00", count: 420 },
       { time: "09:10", count: 680 },

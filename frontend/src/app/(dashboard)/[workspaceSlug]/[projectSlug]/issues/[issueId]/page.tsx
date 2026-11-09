@@ -30,16 +30,26 @@ import { AiInvestigationCard } from "@/features/issues/components/ai-investigati
 import { BreadcrumbsPanel } from "@/features/issues/components/breadcrumbs-panel";
 import { EventsFrequencyChart } from "@/features/issues/components/events-frequency-chart";
 import { useIssueDetail, useUpdateIssueStatus } from "@/features/issues/hooks";
+import { useProjectBySlug } from "@/features/projects/hooks";
+import { ProjectNotFound } from "@/features/projects/components/project-not-found";
 
 export default function IssueDetailPage() {
   const params = useParams();
   const workspaceSlug = (params.workspaceSlug as string) || "acme-cloud";
+  const projectSlug = (params.projectSlug as string) || "";
   const issueId = params.issueId as string;
+
+  const {
+    project,
+    isLoading: isProjectLoading,
+    isNotFound: isProjectNotFound,
+    isArchived: isProjectArchived,
+  } = useProjectBySlug(projectSlug);
 
   const [copiedFingerprint, setCopiedFingerprint] = useState(false);
   const [currentEventIndex, setCurrentEventIndex] = useState(1);
 
-  const { data: issue, isLoading, isError, error, refetch, isFetching } = useIssueDetail(
+  const { data: issue, isLoading: isIssueLoading, isError, error, refetch, isFetching } = useIssueDetail(
     workspaceSlug,
     issueId
   );
@@ -63,6 +73,22 @@ export default function IssueDetailPage() {
     const newStatus = issue.status === "ignored" ? "unresolved" : "ignored";
     updateStatus({ issueId: issue.id, status: newStatus });
   };
+
+  if (isProjectNotFound || isProjectArchived) {
+    return (
+      <ProjectNotFound
+        slug={projectSlug}
+        workspaceSlug={workspaceSlug}
+        isArchived={isProjectArchived}
+      />
+    );
+  }
+
+  const issuesListHref = projectSlug
+    ? `/${workspaceSlug}/${projectSlug}/issues`
+    : `/${workspaceSlug}/issues`;
+
+  const isLoading = isProjectLoading || isIssueLoading;
 
   // SKELETON LOADING STATE
   if (isLoading) {
@@ -93,7 +119,7 @@ export default function IssueDetailPage() {
     return (
       <div className="space-y-6">
         <Link
-          href={`/${workspaceSlug}/issues`}
+          href={issuesListHref}
           className="inline-flex items-center gap-1.5 text-body-sm text-text-secondary hover:text-text-primary transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -131,7 +157,7 @@ export default function IssueDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-label-md text-text-secondary">
           <Link
-            href={`/${workspaceSlug}/issues`}
+            href={issuesListHref}
             className="inline-flex items-center gap-1 hover:text-text-primary transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />

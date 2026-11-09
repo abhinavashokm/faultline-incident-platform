@@ -215,6 +215,7 @@ export default function IssuesListPage() {
               <IssueTable
                 issues={data.items}
                 workspaceSlug={workspaceSlug}
+                projectSlug={projectSlug}
                 selectedIds={selectedIds}
                 onToggleSelect={handleToggleSelect}
                 onToggleSelectAll={handleToggleSelectAll}

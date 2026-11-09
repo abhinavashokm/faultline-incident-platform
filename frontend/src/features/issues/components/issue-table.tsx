@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 interface IssueTableProps {
   issues: IssueListItem[];
   workspaceSlug: string;
+  projectSlug?: string;
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
@@ -22,6 +23,7 @@ interface IssueTableProps {
 export function IssueTable({
   issues,
   workspaceSlug,
+  projectSlug,
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
@@ -29,6 +31,12 @@ export function IssueTable({
   isBulkLoading,
 }: IssueTableProps) {
   const router = useRouter();
+
+  const getIssueDetailUrl = (issueId: string) => {
+    return projectSlug
+      ? `/${workspaceSlug}/${projectSlug}/issues/${issueId}`
+      : `/${workspaceSlug}/issues/${issueId}`;
+  };
 
   const allSelected = issues.length > 0 && selectedIds.length === issues.length;
 
@@ -99,7 +107,7 @@ export function IssueTable({
               return (
                 <tr
                   key={issue.id}
-                  onClick={() => router.push(`/${workspaceSlug}/issues/${issue.id}`)}
+                  onClick={() => router.push(getIssueDetailUrl(issue.id))}
                   className={cn(
                     "h-11 transition-colors cursor-pointer text-body-sm select-none",
                     isSelected
@@ -125,7 +133,7 @@ export function IssueTable({
                   <td className="py-2 px-3 min-w-[280px]">
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/${workspaceSlug}/issues/${issue.id}`}
+                        href={getIssueDetailUrl(issue.id)}
                         className="font-medium text-text-primary hover:text-primary transition-colors truncate max-w-md block"
                         onClick={(e) => e.stopPropagation()}
                       >
