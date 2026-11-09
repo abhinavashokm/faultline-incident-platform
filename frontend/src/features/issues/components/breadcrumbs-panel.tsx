@@ -2,12 +2,11 @@
 
 import React, { useState } from "react";
 import { Breadcrumb } from "../types";
-import { History, Tag, Globe, User, Shield, Database, Terminal } from "lucide-react";
+import { Tag, Globe, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// TODO(mock): Contextual breadcrumbs telemetry planned in SDK spec; providing mock history
 interface BreadcrumbsPanelProps {
-  breadcrumbs: Breadcrumb[];
+  breadcrumbs?: Breadcrumb[];
   tags: Record<string, string>;
   user?: {
     id: string;
@@ -22,32 +21,17 @@ interface BreadcrumbsPanelProps {
 }
 
 export function BreadcrumbsPanel({
-  breadcrumbs,
   tags,
   user,
   request,
 }: BreadcrumbsPanelProps) {
-  const [activeTab, setActiveTab] = useState<"breadcrumbs" | "tags" | "context">("breadcrumbs");
+  const [activeTab, setActiveTab] = useState<"tags" | "context">("tags");
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-level-1 overflow-hidden">
       {/* Header Tabs */}
       <div className="flex items-center justify-between border-b border-border bg-canvas/40 px-4 py-2">
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("breadcrumbs")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-label-md font-medium transition-colors",
-              activeTab === "breadcrumbs"
-                ? "bg-card text-primary font-semibold shadow-level-1"
-                : "text-text-secondary hover:text-text-primary"
-            )}
-          >
-            <History className="h-3.5 w-3.5" />
-            <span>Breadcrumbs ({breadcrumbs.length})</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setActiveTab("tags")}
@@ -84,53 +68,6 @@ export function BreadcrumbsPanel({
 
       {/* Content Panes */}
       <div className="p-4">
-        {/* Breadcrumbs Tab */}
-        {activeTab === "breadcrumbs" && (
-          <div className="space-y-3">
-            <p className="text-[12px] text-text-secondary">
-              Chronological actions leading up to the unhandled exception:
-            </p>
-            <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
-              {breadcrumbs.map((crumb, idx) => (
-                <div key={idx} className="relative flex items-start gap-3">
-                  <span
-                    className={cn(
-                      "absolute -left-6 top-1 h-2.5 w-2.5 rounded-full border-2 border-card ring-2 ring-border",
-                      crumb.level === "error"
-                        ? "bg-error ring-error/30"
-                        : crumb.level === "warning"
-                        ? "bg-warning ring-warning/30"
-                        : "bg-primary ring-primary/30"
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-text-muted">
-                        {crumb.timestamp}
-                      </span>
-                      <span
-                        className={cn(
-                          "font-mono text-[10px] px-1.5 rounded font-semibold uppercase",
-                          crumb.category === "db"
-                            ? "bg-primary-tint text-primary"
-                            : crumb.category === "auth"
-                            ? "bg-success-container text-success-foreground"
-                            : "bg-canvas border border-border text-text-secondary"
-                        )}
-                      >
-                        {crumb.category}
-                      </span>
-                    </div>
-                    <p className="font-mono text-[12px] text-text-primary mt-1">
-                      {crumb.message}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Tags Tab */}
         {activeTab === "tags" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">

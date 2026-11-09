@@ -13,12 +13,10 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  GitCommit,
   Layers,
   Calendar,
   Users,
   Clock,
-  Sparkles,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -26,9 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StackTraceViewer } from "@/features/issues/components/stack-trace-viewer";
-import { AiInvestigationCard } from "@/features/issues/components/ai-investigation-card";
 import { BreadcrumbsPanel } from "@/features/issues/components/breadcrumbs-panel";
-import { EventsFrequencyChart } from "@/features/issues/components/events-frequency-chart";
 import { useIssueDetail, useUpdateIssueStatus } from "@/features/issues/hooks";
 import { useProjectBySlug } from "@/features/projects/hooks";
 import { ProjectNotFound } from "@/features/projects/components/project-not-found";
@@ -208,11 +204,6 @@ export default function IssueDetailPage() {
               <span className="font-mono text-[11px] px-2 py-0.5 rounded-full bg-canvas border border-border text-text-secondary">
                 {issue.environment}
               </span>
-
-              <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-muted border border-border text-text-secondary flex items-center gap-1">
-                <GitCommit className="h-3 w-3" />
-                <span>{issue.commitSha}</span>
-              </span>
             </div>
 
             <h1 className="text-headline-md font-semibold text-text-primary tracking-tight break-words">
@@ -337,12 +328,6 @@ export default function IssueDetailPage() {
         </div>
       </div>
 
-      {/* Events-over-time Chart */}
-      <EventsFrequencyChart
-        timeline={issue.eventsTimeline}
-        totalEvents={issue.totalEvents}
-      />
-
       {/* Event Navigation Bar */}
       <div className="rounded-lg border border-border bg-card p-3 shadow-level-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-label-md">
         <div className="flex items-center gap-2">
@@ -380,18 +365,11 @@ export default function IssueDetailPage() {
         </div>
       </div>
 
-      {/* AI Root Cause Panel */}
-      <AiInvestigationCard
-        investigation={issue.investigation}
-        onRunInvestigation={() => alert("Triggering AI root cause investigation request...")}
-      />
-
       {/* Stack Trace Viewer (per DESIGN.md spec) */}
       <StackTraceViewer frames={issue.latestEvent.stackFrames} />
 
-      {/* Breadcrumbs, Tags & Context Panel */}
+      {/* Tags & Context Panel */}
       <BreadcrumbsPanel
-        breadcrumbs={issue.latestEvent.breadcrumbs}
         tags={issue.latestEvent.tags}
         user={issue.latestEvent.user}
         request={issue.latestEvent.request}
