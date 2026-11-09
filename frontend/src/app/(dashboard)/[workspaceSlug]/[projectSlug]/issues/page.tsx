@@ -8,7 +8,6 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Terminal,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,31 +20,65 @@ import {
   useBulkUpdateIssueStatus,
 } from "@/features/issues/hooks";
 import { IssueFilterParams, IssueStatus } from "@/features/issues/types";
+import { useProjectBySlug } from "@/features/projects/hooks";
+import { ProjectNotFound } from "@/features/projects/components/project-not-found";
 
 export default function IssuesListPage() {
   const params = useParams();
   const workspaceSlug = (params.workspaceSlug as string) || "acme-cloud";
+  const projectSlug = (params.projectSlug as string) || "";
+
+  const {
+    project,
+    isLoading: isProjectLoading,
+    isNotFound: isProjectNotFound,
+    isArchived: isProjectArchived,
+  } = useProjectBySlug(projectSlug);
 
   const [filters, setFilters] = useState<IssueFilterParams>({
     status: "unresolved",
-    timeRange: "24h",
-    search: "",
     limit: 25,
   });
 
+  // Cursor pagination state: stack of previous cursors for backwards navigation
+  const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([]);
+  const currentCursor = cursorStack[cursorStack.length - 1];
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useIssuesList(
-    workspaceSlug,
-    filters
-  );
+  const {
+    data,
+    isLoading: isIssuesLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useIssuesList(project?.id, {
+    ...filters,
+    cursor: currentCursor,
+  });
 
   const { mutate: bulkUpdateStatus, isPending: isBulkUpdating } =
     useBulkUpdateIssueStatus();
 
   const handleFilterChange = (newFilters: Partial<IssueFilterParams>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
+    setCursorStack([]);
     setSelectedIds([]);
+  };
+
+  const handleNextPage = () => {
+    if (data?.meta.nextCursor) {
+      setCursorStack((prev) => [...prev, data.meta.nextCursor!]);
+      setSelectedIds([]);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (cursorStack.length > 0) {
+      setCursorStack((prev) => prev.slice(0, prev.length - 1));
+      setSelectedIds([]);
+    }
   };
 
   const handleToggleSelect = (id: string) => {
@@ -75,6 +108,18 @@ export default function IssuesListPage() {
     );
   };
 
+  if (isProjectNotFound || isProjectArchived) {
+    return (
+      <ProjectNotFound
+        slug={projectSlug}
+        workspaceSlug={workspaceSlug}
+        isArchived={isProjectArchived}
+      />
+    );
+  }
+
+  const isLoading = isProjectLoading || isIssuesLoading;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -98,7 +143,7 @@ export default function IssuesListPage() {
             variant="secondary"
             size="sm"
             onClick={() => refetch()}
-            disabled={isFetching}
+            disabled={isFetching || isProjectLoading}
             className="gap-1.5"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
@@ -111,7 +156,6 @@ export default function IssuesListPage() {
       <IssueFilterBar
         filters={filters}
         onFilterChange={handleFilterChange}
-        unresolvedCount={filters.status === "unresolved" ? data?.totalCount : undefined}
       />
 
       {/* ERROR STATE */}
@@ -162,19 +206,8 @@ export default function IssuesListPage() {
                 No issues found
               </h3>
               <p className="text-body-sm text-text-secondary max-w-sm mx-auto mt-1 mb-5">
-                {filters.search
-                  ? `No issues matching "${filters.search}". Try adjusting your search query or filters.`
-                  : `There are currently no ${filters.status} issues.`}
+                {`There are currently no ${filters.status} issues for this project.`}
               </p>
-              {filters.search && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleFilterChange({ search: "" })}
-                >
-                  Clear search query
-                </Button>
-              )}
             </div>
           ) : (
             <>
@@ -192,14 +225,16 @@ export default function IssuesListPage() {
               {/* Pagination Footer */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-label-sm text-text-secondary px-1">
                 <span>
-                  Showing {data.items.length} of {data.totalCount} issues
+                  Showing {data.items.length} {data.items.length === 1 ? "issue" : "issues"}
+                  {cursorStack.length > 0 && ` (Page ${cursorStack.length + 1})`}
                 </span>
 
                 <div className="flex items-center gap-1.5">
                   <Button
                     variant="secondary"
                     size="sm"
-                    disabled
+                    onClick={handlePrevPage}
+                    disabled={cursorStack.length === 0 || isFetching}
                     className="h-8 gap-1 text-label-sm"
                   >
                     <ChevronLeft className="h-3.5 w-3.5" />
@@ -208,7 +243,8 @@ export default function IssuesListPage() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    disabled={!data.hasMore}
+                    onClick={handleNextPage}
+                    disabled={!data.meta.hasMore || !data.meta.nextCursor || isFetching}
                     className="h-8 gap-1 text-label-sm"
                   >
                     <span>Next</span>

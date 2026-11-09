@@ -8,12 +8,13 @@ import {
 import { IssueFilterParams, IssueStatus } from "./types";
 
 export function useIssuesList(
-  workspaceSlug: string,
+  projectId?: string,
   filters: IssueFilterParams = {}
 ) {
   return useQuery({
-    queryKey: ["issues-list", workspaceSlug, filters],
-    queryFn: () => listIssuesApi(workspaceSlug, filters),
+    queryKey: ["issues-list", projectId, filters],
+    queryFn: () => listIssuesApi(projectId!, filters),
+    enabled: Boolean(projectId),
   });
 }
 

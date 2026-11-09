@@ -1,3 +1,5 @@
+import { keysToCamel, keysToSnake, camelToSnakeCase } from "./utils";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -16,6 +18,11 @@ interface RequestOptions extends RequestInit {
    * never enter an infinite refresh loop.
    */
   _retried?: boolean;
+  /**
+   * Controls case conversion. Defaults to true (converts snake_case response to camelCase,
+   * and camelCase body to snake_case).
+   */
+  transformCase?: boolean;
 }
 
 export async function delay(ms: number = 300): Promise<void> {
@@ -140,13 +147,20 @@ function buildAuthHeaders(): Record<string, string> {
     : {};
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+async function handleResponse<T>(
+  response: Response,
+  transformCase: boolean = true
+): Promise<T> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     const message = extractErrorMessage(errorData, response.statusText);
     throw new ApiError(response.status, message, errorData);
   }
-  return response.json();
+  const data = await response.json();
+  if (transformCase && data !== null && typeof data === "object") {
+    return keysToCamel<T>(data);
+  }
+  return data as T;
 }
 
 function isAuthEndpoint(path: string): boolean {
@@ -168,7 +182,11 @@ export const apiClient = {
     const url = new URL(buildUrl(path));
     if (options?.params) {
       Object.entries(options.params).forEach(([key, val]) => {
-        if (val !== undefined) url.searchParams.append(key, String(val));
+        if (val !== undefined) {
+          const transformedKey =
+            options.transformCase !== false ? camelToSnakeCase(key) : key;
+          url.searchParams.append(transformedKey, String(val));
+        }
       });
     }
 
@@ -189,7 +207,7 @@ export const apiClient = {
       return apiClient.get<T>(path, { ...options, _retried: true });
     }
 
-    return handleResponse<T>(response);
+    return handleResponse<T>(response, options?.transformCase ?? true);
   },
 
   async post<T>(
@@ -197,6 +215,12 @@ export const apiClient = {
     body?: unknown,
     options?: RequestOptions
   ): Promise<T> {
+    const transform = options?.transformCase ?? true;
+    const transformedBody =
+      transform && body !== undefined && body !== null && typeof body === "object"
+        ? keysToSnake(body)
+        : body;
+
     const response = await fetch(buildUrl(path), {
       credentials: "include",
       ...options,
@@ -206,7 +230,7 @@ export const apiClient = {
         ...buildAuthHeaders(),
         ...options?.headers,
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: transformedBody !== undefined ? JSON.stringify(transformedBody) : undefined,
     });
 
     // 401 interception: attempt one silent refresh then retry (skip for auth endpoints)
@@ -215,7 +239,39 @@ export const apiClient = {
       return apiClient.post<T>(path, body, { ...options, _retried: true });
     }
 
-    return handleResponse<T>(response);
+    return handleResponse<T>(response, transform);
+  },
+
+  async patch<T>(
+    path: string,
+    body?: unknown,
+    options?: RequestOptions
+  ): Promise<T> {
+    const transform = options?.transformCase ?? true;
+    const transformedBody =
+      transform && body !== undefined && body !== null && typeof body === "object"
+        ? keysToSnake(body)
+        : body;
+
+    const response = await fetch(buildUrl(path), {
+      credentials: "include",
+      ...options,
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildAuthHeaders(),
+        ...options?.headers,
+      },
+      body: transformedBody !== undefined ? JSON.stringify(transformedBody) : undefined,
+    });
+
+    // 401 interception: attempt one silent refresh then retry (skip for auth endpoints)
+    if (response.status === 401 && !options?._retried && !isAuthEndpoint(path)) {
+      await refreshAccessToken();
+      return apiClient.patch<T>(path, body, { ...options, _retried: true });
+    }
+
+    return handleResponse<T>(response, transform);
   },
 };
 

@@ -1,4 +1,4 @@
-import { delay, ApiError } from "@/lib/api-client";
+import { delay, ApiError, apiClient } from "@/lib/api-client";
 import {
   IssueListItem,
   IssueDetail,
@@ -251,41 +251,24 @@ const mockInvestigation: InvestigationResult = {
 };
 
 export async function listIssuesApi(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _workspaceSlug: string,
+  projectId: string,
   filters: IssueFilterParams = {}
 ): Promise<IssueListResponse> {
-  await delay(400);
-
-  let filtered = [...mockIssuesData];
+  const params: Record<string, string | number | undefined> = {};
 
   if (filters.status) {
-    filtered = filtered.filter((i) => i.status === filters.status);
+    params.status = filters.status;
+  }
+  if (filters.limit) {
+    params.limit = filters.limit;
+  }
+  if (filters.cursor) {
+    params.cursor = filters.cursor;
   }
 
-  if (filters.environment && filters.environment !== "all") {
-    filtered = filtered.filter((i) => i.environment.toLowerCase() === filters.environment?.toLowerCase());
-  }
-
-  if (filters.search) {
-    const q = filters.search.toLowerCase();
-    filtered = filtered.filter(
-      (i) =>
-        i.title.toLowerCase().includes(q) ||
-        i.culprit.toLowerCase().includes(q) ||
-        i.exceptionType.toLowerCase().includes(q) ||
-        i.commitSha.toLowerCase().includes(q)
-    );
-  }
-
-  const limit = filters.limit || 25;
-  const items = filtered.slice(0, limit);
-
-  return {
-    items,
-    totalCount: filtered.length,
-    hasMore: filtered.length > limit,
-  };
+  return apiClient.get<IssueListResponse>(`/api/v1/projects/${projectId}/issues`, {
+    params,
+  });
 }
 
 export async function getIssueDetailApi(

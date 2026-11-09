@@ -4,18 +4,18 @@ export type IssueLevel = "error" | "warning" | "info" | "fatal";
 export interface IssueListItem {
   id: string;
   title: string;
-  exceptionType: string;
-  culprit: string;
+  exceptionType?: string | null;
+  culprit?: string | null;
   status: IssueStatus;
   level: IssueLevel;
   occurrenceCount: number;
   affectedUsersCount: number;
-  environment: string;
+  environment?: string | null;
   firstSeen: string;
   lastSeen: string;
-  firstRelease: string;
-  lastRelease: string;
-  commitSha: string;
+  firstRelease?: string | null;
+  lastRelease?: string | null;
+  commitSha?: string | null;
 }
 
 export interface StackFrame {
@@ -92,10 +92,14 @@ export interface IssueFilterParams {
   limit?: number;
 }
 
+export interface PaginationMeta {
+  limit: number;
+  hasMore: boolean;
+  nextCursor?: string | null;
+}
+
 export interface IssueListResponse {
   items: IssueListItem[];
-  totalCount: number;
-  nextCursor?: string;
-  hasMore: boolean;
+  meta: PaginationMeta;
 }
 
