@@ -59,7 +59,7 @@ export default function IssuesListPage() {
   });
 
   const { mutate: bulkUpdateStatus, isPending: isBulkUpdating } =
-    useBulkUpdateIssueStatus();
+    useBulkUpdateIssueStatus(project?.id);
 
   const handleFilterChange = (newFilters: Partial<IssueFilterParams>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));

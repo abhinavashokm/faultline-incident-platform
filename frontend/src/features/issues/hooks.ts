@@ -18,11 +18,11 @@ export function useIssuesList(
   });
 }
 
-export function useIssueDetail(workspaceSlug: string, issueId: string) {
+export function useIssueDetail(projectId?: string, issueId?: string) {
   return useQuery({
-    queryKey: ["issue-detail", workspaceSlug, issueId],
-    queryFn: () => getIssueDetailApi(workspaceSlug, issueId),
-    enabled: Boolean(issueId),
+    queryKey: ["issue-detail", projectId, issueId],
+    queryFn: () => getIssueDetailApi(projectId!, issueId!),
+    enabled: Boolean(projectId && issueId),
   });
 }
 
@@ -31,22 +31,26 @@ export function useUpdateIssueStatus() {
 
   return useMutation({
     mutationFn: ({
+      projectId,
       issueId,
       status,
     }: {
+      projectId: string;
       issueId: string;
       status: IssueStatus;
-    }) => updateIssueStatusApi(issueId, status),
+    }) => updateIssueStatusApi(projectId, issueId, status),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["issues-list"] });
       queryClient.invalidateQueries({
-        queryKey: ["issue-detail", variables.issueId],
+        queryKey: ["issues-list", variables.projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["issue-detail", variables.projectId, variables.issueId],
       });
     },
   });
 }
 
-export function useBulkUpdateIssueStatus() {
+export function useBulkUpdateIssueStatus(projectId?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -56,9 +60,11 @@ export function useBulkUpdateIssueStatus() {
     }: {
       issueIds: string[];
       status: IssueStatus;
-    }) => bulkUpdateIssueStatusApi(issueIds, status),
+    }) => bulkUpdateIssueStatusApi(projectId!, issueIds, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["issues-list"] });
+      queryClient.invalidateQueries({
+        queryKey: ["issues-list", projectId],
+      });
     },
   });
 }

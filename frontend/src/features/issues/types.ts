@@ -77,10 +77,14 @@ export interface InvestigationResult {
 
 export interface IssueDetail extends IssueListItem {
   fingerprint: string;
-  eventsTimeline: { time: string; count: number }[];
-  latestEvent: EventDetail;
-  totalEvents: number;
-  investigation?: InvestigationResult;
+  fingerprintVersion: number;
+  resolvedAt?: string | null;
+  resolvedInRelease?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Note: Event details and navigation will be populated in subsequent tasks
+  latestEvent?: EventDetail;
+  totalEvents?: number;
 }
 
 export interface IssueFilterParams {

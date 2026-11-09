@@ -46,7 +46,7 @@ export default function IssueDetailPage() {
   const [currentEventIndex, setCurrentEventIndex] = useState(1);
 
   const { data: issue, isLoading: isIssueLoading, isError, error, refetch, isFetching } = useIssueDetail(
-    workspaceSlug,
+    project?.id,
     issueId
   );
 
@@ -59,15 +59,15 @@ export default function IssueDetailPage() {
   };
 
   const handleResolve = () => {
-    if (!issue) return;
+    if (!issue || !project?.id) return;
     const newStatus = issue.status === "resolved" ? "unresolved" : "resolved";
-    updateStatus({ issueId: issue.id, status: newStatus });
+    updateStatus({ projectId: project.id, issueId: issue.id, status: newStatus });
   };
 
   const handleIgnore = () => {
-    if (!issue) return;
+    if (!issue || !project?.id) return;
     const newStatus = issue.status === "ignored" ? "unresolved" : "ignored";
-    updateStatus({ issueId: issue.id, status: newStatus });
+    updateStatus({ projectId: project.id, issueId: issue.id, status: newStatus });
   };
 
   if (isProjectNotFound || isProjectArchived) {
@@ -200,10 +200,6 @@ export default function IssueDetailPage() {
               >
                 {issue.status}
               </Badge>
-
-              <span className="font-mono text-[11px] px-2 py-0.5 rounded-full bg-canvas border border-border text-text-secondary">
-                {issue.environment}
-              </span>
             </div>
 
             <h1 className="text-headline-md font-semibold text-text-primary tracking-tight break-words">
@@ -271,7 +267,7 @@ export default function IssueDetailPage() {
           <div className="space-y-0.5">
             <span className="text-text-muted flex items-center gap-1 text-[11px]">
               <Calendar className="h-3 w-3" />
-              <span>First Seen ({issue.firstRelease})</span>
+              <span>First Seen{issue.firstRelease ? ` (${issue.firstRelease})` : ""}</span>
             </span>
             <div className="font-mono text-body-sm text-text-secondary truncate">
               {new Date(issue.firstSeen).toLocaleDateString("en-US", {
@@ -287,7 +283,7 @@ export default function IssueDetailPage() {
           <div className="space-y-0.5">
             <span className="text-text-muted flex items-center gap-1 text-[11px]">
               <Clock className="h-3 w-3" />
-              <span>Last Seen ({issue.lastRelease})</span>
+              <span>Last Seen{issue.lastRelease ? ` (${issue.lastRelease})` : ""}</span>
             </span>
             <div className="font-mono text-body-sm text-text-secondary truncate">
               {new Date(issue.lastSeen).toLocaleDateString("en-US", {
@@ -329,51 +325,57 @@ export default function IssueDetailPage() {
       </div>
 
       {/* Event Navigation Bar */}
-      <div className="rounded-lg border border-border bg-card p-3 shadow-level-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-label-md">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-text-primary">Viewing Event:</span>
-          <span className="font-mono text-text-secondary">
-            #{currentEventIndex} of {issue.totalEvents.toLocaleString()} (Latest)
-          </span>
-          <span className="text-border">•</span>
-          <span className="font-mono text-[11px] text-text-muted truncate">
-            ID: {issue.latestEvent.id}
-          </span>
-        </div>
+      {issue.latestEvent && (
+        <div className="rounded-lg border border-border bg-card p-3 shadow-level-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-label-md">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-text-primary">Viewing Event:</span>
+            <span className="font-mono text-text-secondary">
+              #{currentEventIndex} of {(issue.totalEvents ?? issue.occurrenceCount).toLocaleString()} (Latest)
+            </span>
+            <span className="text-border">•</span>
+            <span className="font-mono text-[11px] text-text-muted truncate">
+              ID: {issue.latestEvent.id}
+            </span>
+          </div>
 
-        <div className="flex items-center gap-1.5 self-end sm:self-auto">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={currentEventIndex <= 1}
-            onClick={() => setCurrentEventIndex((prev) => Math.max(1, prev - 1))}
-            className="h-7 text-label-sm gap-1"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            <span>Older</span>
-          </Button>
+          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={currentEventIndex <= 1}
+              onClick={() => setCurrentEventIndex((prev) => Math.max(1, prev - 1))}
+              className="h-7 text-label-sm gap-1"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              <span>Older</span>
+            </Button>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled
-            className="h-7 text-label-sm gap-1"
-          >
-            <span>Newer</span>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled
+              className="h-7 text-label-sm gap-1"
+            >
+              <span>Newer</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Stack Trace Viewer (per DESIGN.md spec) */}
-      <StackTraceViewer frames={issue.latestEvent.stackFrames} />
+      {issue.latestEvent?.stackFrames && (
+        <StackTraceViewer frames={issue.latestEvent.stackFrames} />
+      )}
 
       {/* Tags & Context Panel */}
-      <BreadcrumbsPanel
-        tags={issue.latestEvent.tags}
-        user={issue.latestEvent.user}
-        request={issue.latestEvent.request}
-      />
+      {issue.latestEvent && (
+        <BreadcrumbsPanel
+          tags={issue.latestEvent.tags}
+          user={issue.latestEvent.user}
+          request={issue.latestEvent.request}
+        />
+      )}
     </div>
   );
 }
