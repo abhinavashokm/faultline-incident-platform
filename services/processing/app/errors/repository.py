@@ -26,18 +26,23 @@ class ErrorsRepository:
     async def upsert_issue(self, values: dict[str, Any]) -> tuple[UUID, bool]:
         """Upsert the issue on (project_id, fingerprint).
 
-        Performs a no-op update on conflict, returning the issue ID and whether the
-        row was newly inserted (is_new).
+        Updates first_seen_at, last_seen_at, and updated_at on conflict, returning
+        the issue ID and whether the row was newly inserted (is_new).
         """
-        stmt = (
-            pg_insert(Issue)
-            .values(**values)
-            .on_conflict_do_update(
-                index_elements=["project_id", "fingerprint"],
-                set_={"fingerprint": pg_insert(Issue).excluded.fingerprint},
-            )
-            .returning(Issue.id, text("(xmax = 0) AS is_new"))
-        )
+        stmt = pg_insert(Issue).values(**values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["project_id", "fingerprint"],
+            set_={
+                "first_seen_at": func.least(
+                    Issue.first_seen_at, stmt.excluded.first_seen_at
+                ),
+                "last_seen_at": func.greatest(
+                    Issue.last_seen_at, stmt.excluded.last_seen_at
+                ),
+                "updated_at": func.now(),
+            },
+        ).returning(Issue.id, text("(xmax = 0) AS is_new"))
+        
         result = await self.session.execute(stmt)
         row = result.one()
         return row[0], bool(row[1])
@@ -71,7 +76,10 @@ class ErrorsRepository:
                 first_seen_at=func.least(Issue.first_seen_at, occurred_at),
                 last_seen_at=func.greatest(Issue.last_seen_at, occurred_at),
                 last_release=case(
-                    (occurred_at >= Issue.last_seen_at, func.coalesce(release, Issue.last_release)),
+                    (
+                        occurred_at >= Issue.last_seen_at,
+                        func.coalesce(release, Issue.last_release),
+                    ),
                     else_=Issue.last_release,
                 ),
                 updated_at=func.now(),
@@ -84,7 +92,9 @@ class ErrorsRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_issue_by_fingerprint(self, project_id: UUID, fingerprint: str) -> Issue | None:
+    async def get_issue_by_fingerprint(
+        self, project_id: UUID, fingerprint: str
+    ) -> Issue | None:
         stmt = select(Issue).where(
             Issue.project_id == project_id,
             Issue.fingerprint == fingerprint,
@@ -119,25 +129,22 @@ class ErrorsRepository:
         cursor: tuple[datetime, UUID] | None,
     ) -> list[dict[str, Any]]:
         """List issues ordered by last_seen_at DESC, id DESC with keyset pagination."""
-        stmt = (
-            select(
-                Issue.id,
-                Issue.title,
-                Issue.status,
-                Issue.level,
-                Issue.exception_type,
-                Issue.culprit,
-                Issue.occurrence_count,
-                Issue.first_seen_at.label("first_seen"),
-                Issue.last_seen_at.label("last_seen"),
-                Issue.first_release,
-                Issue.last_release,
-                Issue.affected_users_count,
-            )
-            .where(
-                Issue.workspace_id == workspace_id,
-                Issue.project_id == project_id,
-            )
+        stmt = select(
+            Issue.id,
+            Issue.title,
+            Issue.status,
+            Issue.level,
+            Issue.exception_type,
+            Issue.culprit,
+            Issue.occurrence_count,
+            Issue.first_seen_at.label("first_seen"),
+            Issue.last_seen_at.label("last_seen"),
+            Issue.first_release,
+            Issue.last_release,
+            Issue.affected_users_count,
+        ).where(
+            Issue.workspace_id == workspace_id,
+            Issue.project_id == project_id,
         )
         if status:
             stmt = stmt.where(Issue.status == status)
@@ -154,7 +161,9 @@ class ErrorsRepository:
                 )
             )
 
-        stmt = stmt.order_by(Issue.last_seen_at.desc(), Issue.id.desc()).limit(limit + 1)
+        stmt = stmt.order_by(Issue.last_seen_at.desc(), Issue.id.desc()).limit(
+            limit + 1
+        )
         res = await self.session.execute(stmt)
         return [dict(row) for row in res.mappings().all()]
 
@@ -182,24 +191,21 @@ class ErrorsRepository:
         cursor: tuple[datetime, UUID] | None,
     ) -> list[dict[str, Any]]:
         """List events of an issue ordered by occurred_at DESC, id DESC with keyset pagination."""
-        stmt = (
-            select(
-                ErrorEvent.id,
-                ErrorEvent.issue_id,
-                ErrorEvent.occurred_at,
-                ErrorEvent.received_at,
-                ErrorEvent.level,
-                ErrorEvent.exception_type,
-                ErrorEvent.message,
-                ErrorEvent.environment,
-                ErrorEvent.release,
-                ErrorEvent.event_type,
-            )
-            .where(
-                ErrorEvent.workspace_id == workspace_id,
-                ErrorEvent.project_id == project_id,
-                ErrorEvent.issue_id == issue_id,
-            )
+        stmt = select(
+            ErrorEvent.id,
+            ErrorEvent.issue_id,
+            ErrorEvent.occurred_at,
+            ErrorEvent.received_at,
+            ErrorEvent.level,
+            ErrorEvent.exception_type,
+            ErrorEvent.message,
+            ErrorEvent.environment,
+            ErrorEvent.release,
+            ErrorEvent.event_type,
+        ).where(
+            ErrorEvent.workspace_id == workspace_id,
+            ErrorEvent.project_id == project_id,
+            ErrorEvent.issue_id == issue_id,
         )
 
         if cursor:
@@ -214,7 +220,9 @@ class ErrorsRepository:
                 )
             )
 
-        stmt = stmt.order_by(ErrorEvent.occurred_at.desc(), ErrorEvent.id.desc()).limit(limit + 1)
+        stmt = stmt.order_by(ErrorEvent.occurred_at.desc(), ErrorEvent.id.desc()).limit(
+            limit + 1
+        )
         res = await self.session.execute(stmt)
         return [dict(row) for row in res.mappings().all()]
 
