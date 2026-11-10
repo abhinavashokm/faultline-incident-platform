@@ -46,17 +46,12 @@ def parse_dsn(dsn_str: str) -> Dsn:
             "Invalid DSN: missing project API key. Expected format: https://<project_api_key>@<host>"
         )
 
-    userinfo, host_part = parsed.netloc.split("@", 1)
-    if not userinfo:
+    api_key, host_part = parsed.netloc.split("@", 1)
+    if not api_key:
         raise DsnError("Invalid DSN: project API key cannot be empty")
 
     if not host_part:
         raise DsnError("Invalid DSN: host cannot be empty")
-
-    # Extract API key (handle user:password if provided, though only key is expected)
-    api_key = userinfo.split(":", 1)[0]
-    if not api_key:
-        raise DsnError("Invalid DSN: project API key cannot be empty")
 
     # Construct the base ingest URL (/api/v1/events) and performance URL (/api/v1/ingest/performance)
     base_path = parsed.path.rstrip("/")
