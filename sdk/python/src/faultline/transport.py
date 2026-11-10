@@ -19,8 +19,10 @@ class Transport:
     def __init__(self, config: Config) -> None:
         self.config = config
         self._queue: queue.Queue[Any] = queue.Queue(maxsize=config.max_queue_size)
-        self._stop_event = threading.Event()
+        # Set by close(); send() rejects new events, but the worker keeps draining the queue.
         self._closed = False
+        # Set by close() after the flush attempt; tells the worker to exit and wakes any retry backoff.
+        self._stop_event = threading.Event()
 
         # In-flight task tracking for timed flush
         self._lock = threading.Lock()
