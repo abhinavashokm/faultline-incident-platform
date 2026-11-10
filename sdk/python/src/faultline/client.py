@@ -31,7 +31,18 @@ class Client:
         context: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> str | None:
-        """Capture an exception, scrub sensitive data, and enqueue for background delivery."""
+        """Capture an exception, scrub sensitive data, and enqueue for background delivery.
+
+        Returns:
+            The event ID if the event was accepted into the queue, otherwise None.
+
+            Note: a returned ID means the event was *queued*, not *delivered*.
+            Delivery happens asynchronously in a background thread and may still
+            fail (network errors, invalid key, retries exhausted) without
+            notifying the caller. None means the event was dropped, either
+            because the queue is full, the client is closed, or an error
+            occurred while building the event.
+        """
         try:
             # Redact context prior to serialization
             scrubbed_context = redact_sensitive_data(context) if context else {}
@@ -102,6 +113,7 @@ class Client:
         """Block until queued events are transmitted or timeout expires."""
         try:
             from faultline.performance import flush_performance_batch
+
             flush_performance_batch(client=self)
             return self.transport.flush(timeout=timeout)
         except Exception as err:
@@ -112,6 +124,7 @@ class Client:
         """Flush remaining events and terminate transport thread."""
         try:
             from faultline.performance import flush_performance_batch
+
             flush_performance_batch(client=self)
             self.transport.close(timeout=timeout)
         except Exception as err:
