@@ -3,6 +3,7 @@ import time
 import pytest
 
 from faultline.config import Config
+from faultline.constants import EVENTS_ENDPOINT
 from faultline.transport import Transport
 
 
@@ -31,7 +32,7 @@ def test_transport_202_success(make_mock_server):
 
     assert len(server.requests) == 1
     req = server.requests[0]
-    assert req["path"] == "/api/v1/events"
+    assert req["path"] == EVENTS_ENDPOINT
     assert req["headers"]["X-Faultline-Key"] == "test_proj_key"
     assert json.loads(req["body"]) == event_payload
 

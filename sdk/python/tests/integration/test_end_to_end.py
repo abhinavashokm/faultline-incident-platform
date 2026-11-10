@@ -4,6 +4,7 @@ import uuid
 import pytest
 
 import faultline
+from faultline.constants import EVENTS_ENDPOINT
 from faultline.integrations.fastapi import FaultlineFastAPIMiddleware
 
 
@@ -86,7 +87,7 @@ def test_fastapi_end_to_end_error_ingestion(make_mock_server):
     assert len(server.requests) >= 1
     req = server.requests[0]
 
-    assert req["path"] == "/api/v1/events"
+    assert req["path"] == EVENTS_ENDPOINT
     assert req["headers"]["X-Faultline-Key"] == "proj_api_key_secret"
     assert req["headers"]["Content-Type"] == "application/json"
 

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from faultline.constants import EVENTS_ENDPOINT, PERFORMANCE_ENDPOINT
+
 
 class DsnError(ValueError):
     """Raised when a Faultline DSN is malformed."""
@@ -55,16 +57,16 @@ def parse_dsn(dsn_str: str) -> Dsn:
 
     # Construct the base ingest URL (/api/v1/events) and performance URL (/api/v1/ingest/performance)
     base_path = parsed.path.rstrip("/")
-    if base_path.endswith("/api/v1/events"):
+    if base_path.endswith(EVENTS_ENDPOINT):
         ingest_url = f"{parsed.scheme}://{host_part}{base_path}"
-        prefix = base_path[:-len("/events")]
-        performance_url = f"{parsed.scheme}://{host_part}{prefix}/ingest/performance"
+        prefix = base_path[:-len(EVENTS_ENDPOINT)]
+        performance_url = f"{parsed.scheme}://{host_part}{prefix}{PERFORMANCE_ENDPOINT}"
     elif base_path:
-        ingest_url = f"{parsed.scheme}://{host_part}{base_path}/api/v1/events"
-        performance_url = f"{parsed.scheme}://{host_part}{base_path}/api/v1/ingest/performance"
+        ingest_url = f"{parsed.scheme}://{host_part}{base_path}{EVENTS_ENDPOINT}"
+        performance_url = f"{parsed.scheme}://{host_part}{base_path}{PERFORMANCE_ENDPOINT}"
     else:
-        ingest_url = f"{parsed.scheme}://{host_part}/api/v1/events"
-        performance_url = f"{parsed.scheme}://{host_part}/api/v1/ingest/performance"
+        ingest_url = f"{parsed.scheme}://{host_part}{EVENTS_ENDPOINT}"
+        performance_url = f"{parsed.scheme}://{host_part}{PERFORMANCE_ENDPOINT}"
 
     return Dsn(
         raw_dsn=dsn_str,

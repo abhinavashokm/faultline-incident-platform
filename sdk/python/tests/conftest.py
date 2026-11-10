@@ -4,6 +4,8 @@ import threading
 from typing import Any, Callable
 import pytest
 
+from faultline.constants import EVENTS_ENDPOINT
+
 
 class MockRequestHandler(BaseHTTPRequestHandler):
     handler_func: Callable[[BaseHTTPRequestHandler], None]
@@ -32,7 +34,7 @@ class MockIngestServer:
 
     @property
     def url(self) -> str:
-        return f"http://127.0.0.1:{self.port}/api/v1/events"
+        return f"http://127.0.0.1:{self.port}{EVENTS_ENDPOINT}"
 
     @property
     def requests(self) -> list[dict[str, Any]]:
