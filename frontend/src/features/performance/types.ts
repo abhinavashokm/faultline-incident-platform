@@ -46,5 +46,32 @@ export interface PerformanceQueryParams {
   to: string; // ISO 8601 UTC
   environment?: string;
   release?: string;
+  route?: string;
+  method?: string;
   mockState?: "normal" | "empty" | "error" | "truncated";
+}
+
+export interface LatencyBucket {
+  le_ms: number | null; // null represents the overflow bucket (> last boundary)
+  count: number;
+}
+
+export interface ReleasePerformance {
+  release: string;
+  requests: number;
+  error_rate: number;
+  p95_ms: number;
+}
+
+export interface EndpointDetailResponse {
+  summary: {
+    request_count: number;
+    error_rate: number;
+    p50_ms: number;
+    p95_ms: number;
+    p99_ms: number;
+  };
+  latency_distribution: LatencyBucket[];
+  status_counts: Record<string, number>;
+  releases: ReleasePerformance[];
 }

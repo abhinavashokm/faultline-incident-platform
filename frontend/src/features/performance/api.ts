@@ -7,6 +7,7 @@ import {
   PerformanceQueryParams,
   EndpointMetricItem,
   TimeseriesPoint,
+  EndpointDetailResponse,
 } from "./types";
 
 /**
@@ -235,8 +236,80 @@ export async function getSummary(
   );
 }
 
+function generateMockEndpointDetail(params: PerformanceQueryParams): EndpointDetailResponse {
+  if (params.mockState === "empty") {
+    return {
+      summary: {
+        request_count: 0,
+        error_rate: 0,
+        p50_ms: 0,
+        p95_ms: 0,
+        p99_ms: 0,
+      },
+      latency_distribution: [
+        { le_ms: 50, count: 0 },
+        { le_ms: 100, count: 0 },
+        { le_ms: 250, count: 0 },
+        { le_ms: 500, count: 0 },
+        { le_ms: 1000, count: 0 },
+        { le_ms: null, count: 0 },
+      ],
+      status_counts: {},
+      releases: [],
+    };
+  }
+
+  let multiplier = 1.0;
+  if (params.environment === "staging") multiplier *= 0.3;
+  if (params.release === "v1.7.2") multiplier *= 0.7;
+
+  const totalReq = Math.round(14200 * multiplier);
+  const errorRate = params.release === "v1.8.0" ? 4.82 : 1.84;
+  const p50 = Math.round(62 * (params.environment === "staging" ? 1.1 : 1));
+  const p95 = Math.round((params.release === "v1.8.0" ? 510 : 380) * (params.environment === "staging" ? 1.2 : 1));
+  const p99 = Math.round(p95 * 2.4);
+
+  // Status counts based on errorRate
+  const errorCount = Math.round(totalReq * (errorRate / 100));
+  const successCount = totalReq - errorCount;
+  const c500 = Math.round(errorCount * 0.7);
+  const c400 = Math.round(errorCount * 0.2);
+  const c422 = errorCount - c500 - c400;
+
+  return {
+    summary: {
+      request_count: totalReq,
+      error_rate: errorRate,
+      p50_ms: p50,
+      p95_ms: p95,
+      p99_ms: p99,
+    },
+    latency_distribution: [
+      { le_ms: 50, count: Math.round(totalReq * 0.408) },
+      { le_ms: 100, count: Math.round(totalReq * 0.324) },
+      { le_ms: 250, count: Math.round(totalReq * 0.148) },
+      { le_ms: 500, count: Math.round(totalReq * 0.077) },
+      { le_ms: 1000, count: Math.round(totalReq * 0.030) },
+      { le_ms: null, count: Math.round(totalReq * 0.013) },
+    ],
+    status_counts: {
+      "200": successCount,
+      "500": c500,
+      "400": c400,
+      "422": Math.max(0, c422),
+    },
+    // The "releases" list IGNORES the release filter
+    releases: [
+      { release: "v1.8.0", requests: 6800000, error_rate: 4.82, p95_ms: 510 },
+      { release: "v1.7.2", requests: 5400000, error_rate: 1.84, p95_ms: 290 },
+      { release: "v1.7.1", requests: 1600000, error_rate: 1.72, p95_ms: 280 },
+      { release: "v1.7.0", requests: 400000, error_rate: 1.65, p95_ms: 275 },
+    ],
+  };
+}
+
 /**
- * 3) GET /timeseries?from&to&environment&release -> 3 charts from the same response
+ * 3) GET /timeseries?from&to&environment&release&route&method -> 3 charts from the same response
  */
 export async function getTimeseries(
   projectId: string,
@@ -253,6 +326,8 @@ export async function getTimeseries(
     to: params.to,
     environment: params.environment,
     release: params.release,
+    route: params.route,
+    method: params.method,
   };
 
   return apiClient.get<PerformanceTimeseries>(
@@ -283,6 +358,34 @@ export async function getEndpoints(
 
   return apiClient.get<PerformanceEndpointsResponse>(
     `/api/v1/projects/${projectId}/performance/endpoints`,
+    { params: queryParams, transformCase: false }
+  );
+}
+
+/**
+ * 5) GET /endpoint?route=/payments&method=POST&from&to&environment&release -> endpoint detail
+ */
+export async function getEndpointDetail(
+  projectId: string,
+  params: PerformanceQueryParams
+): Promise<EndpointDetailResponse> {
+  if (USE_MOCKS) {
+    await delay(400);
+    checkMockErrorState(params);
+    return generateMockEndpointDetail(params);
+  }
+
+  const queryParams: Record<string, string | undefined> = {
+    route: params.route,
+    method: params.method,
+    from: params.from,
+    to: params.to,
+    environment: params.environment,
+    release: params.release,
+  };
+
+  return apiClient.get<EndpointDetailResponse>(
+    `/api/v1/projects/${projectId}/performance/endpoint`,
     { params: queryParams, transformCase: false }
   );
 }

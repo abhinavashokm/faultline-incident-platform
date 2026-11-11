@@ -4,11 +4,21 @@ import React from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { PerformanceSummary } from "../types";
 
+interface KpiData {
+  request_count: number;
+  error_count?: number;
+  error_rate: number;
+  p50_ms: number;
+  p95_ms: number;
+  p99_ms: number;
+}
+
 interface KpiCardsSectionProps {
-  data?: PerformanceSummary;
+  data?: KpiData;
   isLoading: boolean;
   error?: Error | null;
   onRetry?: () => void;
+  hideErrorsCount?: boolean;
 }
 
 function formatNumber(num: number): string {
@@ -27,11 +37,14 @@ export function KpiCardsSection({
   isLoading,
   error,
   onRetry,
+  hideErrorsCount = false,
 }: KpiCardsSectionProps) {
+  const cardCount = hideErrorsCount ? 5 : 6;
+
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
+      <div className={`grid grid-cols-2 sm:grid-cols-3 ${hideErrorsCount ? "lg:grid-cols-5" : "lg:grid-cols-6"} gap-3.5`}>
+        {Array.from({ length: cardCount }).map((_, i) => (
           <div
             key={i}
             className="bg-card p-4 rounded-2xl border border-border shadow-xs animate-pulse space-y-2"
@@ -73,7 +86,9 @@ export function KpiCardsSection({
 
   const items = [
     { label: "Requests", value: formatNumber(data?.request_count ?? 0) },
-    { label: "Errors", value: formatNumber(data?.error_count ?? 0) },
+    ...(hideErrorsCount
+      ? []
+      : [{ label: "Errors", value: formatNumber(data?.error_count ?? 0) }]),
     {
       label: "Error rate",
       value: `${(data?.error_rate ?? 0).toFixed(2)}%`,
@@ -85,7 +100,7 @@ export function KpiCardsSection({
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+    <div className={`grid grid-cols-2 sm:grid-cols-3 ${hideErrorsCount ? "lg:grid-cols-5" : "lg:grid-cols-6"} gap-3.5`}>
       {items.map((item) => (
         <div
           key={item.label}

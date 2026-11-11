@@ -6,6 +6,7 @@ import {
   getSummary,
   getTimeseries,
   getEndpoints,
+  getEndpointDetail,
 } from "./api";
 import { PerformanceQueryParams } from "./types";
 
@@ -18,6 +19,8 @@ export const performanceQueryKeys = {
     [...performanceQueryKeys.all, "timeseries", projectId, params] as const,
   endpoints: (projectId: string, params: PerformanceQueryParams) =>
     [...performanceQueryKeys.all, "endpoints", projectId, params] as const,
+  endpointDetail: (projectId: string, params: PerformanceQueryParams) =>
+    [...performanceQueryKeys.all, "endpointDetail", projectId, params] as const,
 };
 
 export function usePerformanceFilters(projectId: string) {
@@ -64,6 +67,19 @@ export function usePerformanceEndpoints(
     queryKey: performanceQueryKeys.endpoints(projectId, params),
     queryFn: () => getEndpoints(projectId, params),
     enabled: Boolean(projectId) && enabled,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function usePerformanceEndpointDetail(
+  projectId: string,
+  params: PerformanceQueryParams,
+  enabled: boolean = true
+) {
+  return useQuery({
+    queryKey: performanceQueryKeys.endpointDetail(projectId, params),
+    queryFn: () => getEndpointDetail(projectId, params),
+    enabled: Boolean(projectId) && Boolean(params.route) && Boolean(params.method) && enabled,
     staleTime: 30 * 1000,
   });
 }

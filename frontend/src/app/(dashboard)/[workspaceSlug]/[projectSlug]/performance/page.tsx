@@ -289,6 +289,14 @@ function PerformanceOverviewContent() {
           onRetry={refetchEndpoints}
           workspaceSlug={workspaceSlug}
           projectSlug={routeProjectSlug || currentProject?.slug || ""}
+          filterQueryParams={{
+            from: pinnedTimes.from,
+            to: pinnedTimes.to,
+            range: activePreset,
+            environment: environment || undefined,
+            release: release || undefined,
+            mockState: mockState,
+          }}
         />
       </div>
     </div>

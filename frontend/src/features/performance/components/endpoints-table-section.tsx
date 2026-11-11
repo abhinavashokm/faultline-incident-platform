@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Search,
   ArrowUpDown,
@@ -21,6 +22,14 @@ interface EndpointsTableSectionProps {
   onRetry?: () => void;
   workspaceSlug: string;
   projectSlug: string;
+  filterQueryParams?: {
+    from?: string;
+    to?: string;
+    environment?: string;
+    release?: string;
+    range?: string;
+    mockState?: string;
+  };
 }
 
 type SortColumn = "route" | "method" | "requests" | "error_rate" | "p50_ms" | "p95_ms" | "p99_ms";
@@ -61,7 +70,9 @@ export function EndpointsTableSection({
   onRetry,
   workspaceSlug,
   projectSlug,
+  filterQueryParams,
 }: EndpointsTableSectionProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<SortColumn>("p95_ms");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
@@ -267,18 +278,38 @@ export function EndpointsTableSection({
           </thead>
           <tbody className="divide-y divide-border/60 text-xs font-mono">
             {paginatedItems.map((item, index) => {
-              // Target URL with route and method as query params
-              const targetUrl = `/${workspaceSlug}/${projectSlug}/performance/endpoint?route=${encodeURIComponent(
-                item.route
-              )}&method=${encodeURIComponent(item.method)}`;
+              // Target URL with route and method as query params, carrying over time & filters
+              const searchParamsObj = new URLSearchParams();
+              searchParamsObj.set("route", item.route);
+              searchParamsObj.set("method", item.method);
+
+              if (filterQueryParams?.from) searchParamsObj.set("from", filterQueryParams.from);
+              if (filterQueryParams?.to) searchParamsObj.set("to", filterQueryParams.to);
+              if (filterQueryParams?.range) searchParamsObj.set("range", filterQueryParams.range);
+              if (filterQueryParams?.environment) searchParamsObj.set("environment", filterQueryParams.environment);
+              if (filterQueryParams?.release) searchParamsObj.set("release", filterQueryParams.release);
+              if (filterQueryParams?.mockState && filterQueryParams.mockState !== "normal") {
+                searchParamsObj.set("mockState", filterQueryParams.mockState);
+              }
+
+              const targetUrl = `/${workspaceSlug}/${projectSlug}/performance/endpoint?${searchParamsObj.toString()}`;
 
               return (
                 <tr
                   key={`${item.route}-${item.method}-${index}`}
-                  className="hover:bg-surface-container-low/70 transition-colors group cursor-pointer"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      router.push(targetUrl);
+                    }
+                  }}
+                  className="hover:bg-surface-container-low/70 transition-colors group cursor-pointer focus:outline-none focus:bg-primary/5"
                 >
                   <td className="py-3 px-4 font-medium text-primary">
-                    <Link href={targetUrl} className="hover:underline flex items-center gap-1.5">
+                    <Link
+                      href={targetUrl}
+                      className="hover:underline flex items-center gap-1.5 focus:outline-none"
+                    >
                       {item.route}
                     </Link>
                   </td>
