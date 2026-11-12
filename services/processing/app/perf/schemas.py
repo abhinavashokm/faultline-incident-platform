@@ -135,3 +135,63 @@ class NormalizedPerformanceBatch(BaseModel):
         if len(v) > 150:
             raise PydanticCustomError("value_error", "release must be at most 150 characters")
         return v
+
+
+# ---------------------------------------------------------------------------
+# Performance API Read Schemas (List + Detail)
+# ---------------------------------------------------------------------------
+
+
+class EndpointListItem(BaseModel):
+    route: str
+    method: str
+    requests: int
+    error_rate: float
+    p50_ms: int | None
+    p95_ms: int | None
+    p99_ms: int | None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class EndpointsListResponse(BaseModel):
+    items: list[EndpointListItem]
+    total: int
+    truncated: bool
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class EndpointSummary(BaseModel):
+    request_count: int
+    error_rate: float
+    p50_ms: int | None
+    p95_ms: int | None
+    p99_ms: int | None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class LatencyDistributionItem(BaseModel):
+    le_ms: int | None
+    count: int
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class ReleasePerformanceItem(BaseModel):
+    release: str
+    requests: int
+    error_rate: float
+    p95_ms: int | None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class EndpointDetailResponse(BaseModel):
+    summary: EndpointSummary
+    latency_distribution: list[LatencyDistributionItem]
+    status_counts: dict[str, int]
+    releases: list[ReleasePerformanceItem]
+
+    model_config = ConfigDict(extra="ignore")
