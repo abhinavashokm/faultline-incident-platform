@@ -49,7 +49,6 @@ export interface PerformanceQueryParams {
   release?: string;
   route?: string;
   method?: string;
-  mockState?: "normal" | "empty" | "error" | "truncated";
 }
 
 export interface LatencyBucket {

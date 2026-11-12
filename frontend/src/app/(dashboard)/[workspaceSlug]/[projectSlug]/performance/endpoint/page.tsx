@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, Suspense } from "react";
+import React, { useState, useMemo, useCallback, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowLeft } from "lucide-react";
@@ -198,12 +198,32 @@ function EndpointDetailContent() {
     isRefetching: isDetailRefetching,
   } = usePerformanceEndpointDetail(projectId, queryParams, Boolean(projectId && routeParam && methodParam));
 
+  // Redirect to endpoint list / overview page if no data exists for this endpoint
+  const hasNoData =
+    Boolean(detailError && (detailError as any)?.status === 404) ||
+    (!isDetailLoading && detailData && detailData.summary.request_count === 0);
+
+  useEffect(() => {
+    if (hasNoData) {
+      router.replace(overviewBackUrl);
+    }
+  }, [hasNoData, overviewBackUrl, router]);
+
   const handleRefresh = () => {
     refetchTimeseries();
     refetchDetail();
   };
 
   const isRefreshing = isTimeseriesRefetching || isDetailRefetching;
+
+  if (hasNoData) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto text-center space-y-4 animate-pulse">
+        <div className="h-8 w-48 bg-surface-container rounded mx-auto" />
+        <div className="h-4 w-72 bg-surface-container rounded mx-auto" />
+      </div>
+    );
+  }
 
   // Validation: Missing route or method query parameter (real API would return 422)
   if (!routeParam || !methodParam) {

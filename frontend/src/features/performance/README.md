@@ -24,22 +24,11 @@ This module implements the **Performance Overview** screen according to the Stit
 - **`components/status-breakdown.tsx`**: Visualizes HTTP response codes by class (2xx, 3xx, 4xx, 5xx) with proportional segment bar and detailed list.
 - **`components/release-comparison-table.tsx`**: Release comparison highlighting regressions (highest p95 and error rates) and explicitly noting that the release filter is bypassed.
 
-## Switching from Mocks to Real API
+## Backend API Integration
 
-In [`frontend/src/features/performance/api.ts`](./api.ts):
-
-Change line 16:
-```typescript
-export const USE_MOCKS = true;
-```
-to:
-```typescript
-export const USE_MOCKS = false;
-```
-
-All 5 functions will then dispatch real network requests using `apiClient` with proper `Authorization: Bearer <token>` headers to:
+All 5 functions dispatch real network requests using `apiClient` with proper `Authorization: Bearer <token>` headers to:
 - `GET /api/v1/projects/{project_id}/performance/filters`
 - `GET /api/v1/projects/{project_id}/performance/summary`
 - `GET /api/v1/projects/{project_id}/performance/timeseries`
 - `GET /api/v1/projects/{project_id}/performance/endpoints`
-- `GET /api/v1/projects/{project_id}/performance/endpoint?route=...&method=...`
+- `GET /api/v1/projects/{project_id}/performance/endpoint-detail?route=...&method=...`
