@@ -5,7 +5,28 @@ Pure functions only: no database or FastAPI dependencies.
 """
 
 import math
+from datetime import datetime, timedelta
 from typing import Sequence
+
+
+def determine_interval_seconds(from_time: datetime, to_time: datetime) -> int:
+    """Determine timeseries interval bucket width based on the time range duration:
+
+    - <= 2 hours: 60 seconds (1 minute)
+    - <= 12 hours: 300 seconds (5 minutes)
+    - <= 2 days (48 hours): 900 seconds (15 minutes)
+    - > 2 days: 3600 seconds (1 hour)
+    """
+    duration = to_time - from_time
+    if duration <= timedelta(hours=2):
+        return 60
+    elif duration <= timedelta(hours=12):
+        return 300
+    elif duration <= timedelta(days=2):
+        return 900
+    else:
+        return 3600
+
 
 
 def sum_histograms(histograms: Sequence[Sequence[int]]) -> list[int]:

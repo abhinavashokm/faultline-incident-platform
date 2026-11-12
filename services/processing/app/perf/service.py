@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.messaging.consumer import PermanentError
 from app.perf.histograms import HISTOGRAM_BUCKETS
-from app.perf.math import calculate_error_rate, compute_percentile
+from app.perf.math import calculate_error_rate, compute_percentile, determine_interval_seconds
 from app.perf.repository import PerfRepository
 from app.perf.schemas import (
     EndpointDetailResponse,
@@ -22,8 +22,12 @@ from app.perf.schemas import (
     EventEnvelope,
     LatencyDistributionItem,
     NormalizedPerformanceBatch,
+    PerformanceFiltersResponse,
+    PerformanceSummaryResponse,
+    PerformanceTimeseriesResponse,
     ReleasePerformanceItem,
     RouteMetric,
+    TimeseriesPoint,
 )
 
 logger = logging.getLogger(__name__)
@@ -389,3 +393,139 @@ class PerfService:
             status_counts=status_counts,
             releases=releases,
         )
+
+    async def get_summary(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        from_time: datetime,
+        to_time: datetime,
+        environment: str | None = None,
+        release: str | None = None,
+        route: str | None = None,
+        method: str | None = None,
+    ) -> PerformanceSummaryResponse:
+        """Get aggregated performance headline summary numbers for the given filters."""
+        if self.session is None:
+            raise RuntimeError("AsyncSession is required for HTTP read methods")
+
+        repo = PerfRepository(self.session)
+        boundaries = HISTOGRAM_BUCKETS[SUPPORTED_HISTOGRAM_VERSION]
+
+        summary_data = await repo.get_performance_summary(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            from_time=from_time,
+            to_time=to_time,
+            histogram_version=SUPPORTED_HISTOGRAM_VERSION,
+            environment=environment,
+            release=release,
+            route=route,
+            method=method,
+        )
+
+        if summary_data is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found",
+            )
+
+        req_count = summary_data["request_count"]
+        err_count = summary_data["error_count"]
+        hist = summary_data["histogram"]
+
+        return PerformanceSummaryResponse(
+            request_count=req_count,
+            error_count=err_count,
+            error_rate=calculate_error_rate(err_count, req_count),
+            p50_ms=compute_percentile(hist, 0.50, boundaries),
+            p95_ms=compute_percentile(hist, 0.95, boundaries),
+            p99_ms=compute_percentile(hist, 0.99, boundaries),
+        )
+
+    async def get_timeseries(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        from_time: datetime,
+        to_time: datetime,
+        environment: str | None = None,
+        release: str | None = None,
+        route: str | None = None,
+        method: str | None = None,
+    ) -> PerformanceTimeseriesResponse:
+        """Get time-bucketed performance metrics with clock-aligned intervals."""
+        if self.session is None:
+            raise RuntimeError("AsyncSession is required for HTTP read methods")
+
+        interval_seconds = determine_interval_seconds(from_time, to_time)
+        repo = PerfRepository(self.session)
+        boundaries = HISTOGRAM_BUCKETS[SUPPORTED_HISTOGRAM_VERSION]
+
+        rows = await repo.get_performance_timeseries(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            from_time=from_time,
+            to_time=to_time,
+            interval_seconds=interval_seconds,
+            histogram_version=SUPPORTED_HISTOGRAM_VERSION,
+            environment=environment,
+            release=release,
+            route=route,
+            method=method,
+        )
+
+        if rows is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found",
+            )
+
+        # Index existing bucket rows by timestamp
+        row_map: dict[datetime, dict[str, Any]] = {}
+        for r in rows:
+            tb = r["time_bucket"]
+            if tb.tzinfo is None:
+                tb = tb.replace(tzinfo=timezone.utc)
+            else:
+                tb = tb.astimezone(timezone.utc)
+            row_map[tb] = r
+
+        # Generate regular clock-aligned grid
+        start_epoch = math.floor(from_time.timestamp() / interval_seconds) * interval_seconds
+        current_epoch = start_epoch
+        to_epoch = to_time.timestamp()
+
+        points: list[TimeseriesPoint] = []
+        while current_epoch < to_epoch:
+            point_dt = datetime.fromtimestamp(current_epoch, tz=timezone.utc)
+            if point_dt in row_map:
+                data = row_map[point_dt]
+                reqs = data["request_count"]
+                errs = data["error_count"]
+                hist = data["histogram"]
+                points.append(
+                    TimeseriesPoint(
+                        t=point_dt,
+                        requests=reqs,
+                        error_rate=calculate_error_rate(errs, reqs) if reqs > 0 else None,
+                        p95_ms=compute_percentile(hist, 0.95, boundaries) if reqs > 0 else None,
+                    )
+                )
+            else:
+                # Interval with no traffic
+                points.append(
+                    TimeseriesPoint(
+                        t=point_dt,
+                        requests=0,
+                        error_rate=None,
+                        p95_ms=None,
+                    )
+                )
+            current_epoch += interval_seconds
+
+        return PerformanceTimeseriesResponse(
+            interval_seconds=interval_seconds,
+            points=points,
+        )
+

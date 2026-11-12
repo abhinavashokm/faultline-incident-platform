@@ -138,8 +138,43 @@ class NormalizedPerformanceBatch(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Performance API Read Schemas (List + Detail)
+# Performance API Read Schemas (List + Detail + Filters + Summary + Timeseries)
 # ---------------------------------------------------------------------------
+
+
+class PerformanceFiltersResponse(BaseModel):
+    environments: list[str] = Field(default_factory=list)
+    releases: list[str] = Field(default_factory=list)
+    services: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PerformanceSummaryResponse(BaseModel):
+    request_count: int
+    error_count: int
+    error_rate: float
+    p50_ms: int | None
+    p95_ms: int | None
+    p99_ms: int | None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class TimeseriesPoint(BaseModel):
+    t: datetime
+    requests: int
+    error_rate: float | None
+    p95_ms: int | None
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class PerformanceTimeseriesResponse(BaseModel):
+    interval_seconds: int
+    points: list[TimeseriesPoint]
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class EndpointListItem(BaseModel):

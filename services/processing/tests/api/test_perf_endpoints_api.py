@@ -397,3 +397,220 @@ async def test_unauthenticated_request_fails(
         },
     )
     assert res_detail.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_performance_filters_endpoint(
+    client: AsyncClient,
+    test_project_id: uuid.UUID,
+) -> None:
+    response = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/filters",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "environments" in data
+    assert "releases" in data
+    assert "services" in data
+
+
+@pytest.mark.asyncio
+async def test_performance_summary_happy_path_and_filters(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    test_workspace_id: uuid.UUID,
+    test_project_id: uuid.UUID,
+) -> None:
+    now = datetime(2026, 11, 12, 12, 0, 0, tzinfo=timezone.utc)
+    await insert_bucket(
+        session_factory,
+        workspace_id=test_workspace_id,
+        project_id=test_project_id,
+        route_template="/api/items",
+        http_method="GET",
+        environment="staging",
+        release="v1.0.0",
+        bucket_start=now,
+        request_count=1000,
+        error_count=50,
+        latency_histogram=[400, 300, 200, 50, 30, 20],
+    )
+    await insert_bucket(
+        session_factory,
+        workspace_id=test_workspace_id,
+        project_id=test_project_id,
+        route_template="/api/checkout",
+        http_method="POST",
+        environment="production",
+        release="v1.1.0",
+        bucket_start=now,
+        request_count=500,
+        error_count=10,
+        latency_histogram=[100, 100, 100, 100, 50, 50],
+    )
+
+    from_time = (now - timedelta(hours=1)).isoformat()
+    to_time = (now + timedelta(hours=1)).isoformat()
+
+    # Overall summary (no filter)
+    res_overall = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/summary",
+        params={"from": from_time, "to": to_time},
+    )
+    assert res_overall.status_code == 200
+    data_overall = res_overall.json()
+    assert data_overall["request_count"] == 1500
+    assert data_overall["error_count"] == 60
+    assert data_overall["error_rate"] == 4.0
+    assert data_overall["p50_ms"] is not None
+    assert data_overall["p95_ms"] is not None
+    assert data_overall["p99_ms"] is not None
+
+    # Filter by route and method
+    res_filtered = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/summary",
+        params={
+            "from": from_time,
+            "to": to_time,
+            "route": "/api/items",
+            "method": "get ",  # test trimming and uppercase normalization
+        },
+    )
+    assert res_filtered.status_code == 200
+    data_filtered = res_filtered.json()
+    assert data_filtered["request_count"] == 1000
+    assert data_filtered["error_count"] == 50
+    assert data_filtered["error_rate"] == 5.0
+
+
+@pytest.mark.asyncio
+async def test_performance_summary_and_timeseries_validation(
+    client: AsyncClient,
+    test_project_id: uuid.UUID,
+) -> None:
+    now = datetime(2026, 11, 12, 12, 0, 0, tzinfo=timezone.utc)
+    from_time = (now - timedelta(hours=1)).isoformat()
+    to_time = (now + timedelta(hours=1)).isoformat()
+
+    # Route without method -> 422
+    res_no_method = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/summary",
+        params={"from": from_time, "to": to_time, "route": "/api/users"},
+    )
+    assert res_no_method.status_code == 422
+    assert res_no_method.json()["detail"][0]["field"] == "method"
+
+    # Method without route -> 422
+    res_no_route = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/summary",
+        params={"from": from_time, "to": to_time, "method": "GET"},
+    )
+    assert res_no_route.status_code == 422
+    assert res_no_route.json()["detail"][0]["field"] == "route"
+
+    # Same for timeseries: route without method -> 422
+    res_ts_no_method = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/timeseries",
+        params={"from": from_time, "to": to_time, "route": "/api/users"},
+    )
+    assert res_ts_no_method.status_code == 422
+
+    # Same for timeseries: method without route -> 422
+    res_ts_no_route = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/timeseries",
+        params={"from": from_time, "to": to_time, "method": "GET"},
+    )
+    assert res_ts_no_route.status_code == 422
+
+    # Bad time range: from >= to -> 422
+    res_bad_range = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/summary",
+        params={"from": to_time, "to": from_time},
+    )
+    assert res_bad_range.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_performance_timeseries_happy_path(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    test_workspace_id: uuid.UUID,
+    test_project_id: uuid.UUID,
+) -> None:
+    # 1 hour window -> interval should be 60 seconds
+    base_time = datetime(2026, 11, 12, 12, 0, 0, tzinfo=timezone.utc)
+    t1 = base_time + timedelta(minutes=5)
+    await insert_bucket(
+        session_factory,
+        workspace_id=test_workspace_id,
+        project_id=test_project_id,
+        route_template="/test/ts",
+        http_method="GET",
+        bucket_start=t1,
+        request_count=100,
+        error_count=2,
+        latency_histogram=[80, 10, 5, 3, 2, 0],
+    )
+
+    from_time = base_time.isoformat()
+    to_time = (base_time + timedelta(minutes=10)).isoformat()
+
+    response = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/timeseries",
+        params={"from": from_time, "to": to_time},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["interval_seconds"] == 60
+    assert len(data["points"]) == 10  # 10 1-minute buckets
+
+    # Find the bucket at t1
+    matching_points = [p for p in data["points"] if p["t"] == t1.strftime("%Y-%m-%dT%H:%M:%SZ")]
+    assert len(matching_points) == 1
+    pt = matching_points[0]
+    assert pt["requests"] == 100
+    assert pt["error_rate"] == 2.0
+    assert pt["p95_ms"] is not None
+
+    # Empty buckets should have requests=0 and null error_rate/p95_ms
+    empty_points = [p for p in data["points"] if p["requests"] == 0]
+    assert len(empty_points) == 9
+    assert empty_points[0]["error_rate"] is None
+    assert empty_points[0]["p95_ms"] is None
+
+
+@pytest.mark.asyncio
+async def test_workspace_isolation_summary_and_timeseries(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    test_project_id: uuid.UUID,
+) -> None:
+    # Insert for other workspace
+    other_workspace_id = uuid.uuid4()
+    now = datetime(2026, 11, 12, 12, 0, 0, tzinfo=timezone.utc)
+    await insert_bucket(
+        session_factory,
+        workspace_id=other_workspace_id,
+        project_id=test_project_id,
+        route_template="/secret",
+        http_method="GET",
+        bucket_start=now,
+    )
+
+    from_time = (now - timedelta(hours=1)).isoformat()
+    to_time = (now + timedelta(hours=1)).isoformat()
+
+    # Summary should return 404
+    res_summary = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/summary",
+        params={"from": from_time, "to": to_time},
+    )
+    assert res_summary.status_code == 404
+
+    # Timeseries should return 404
+    res_timeseries = await client.get(
+        f"/api/v1/projects/{test_project_id}/performance/timeseries",
+        params={"from": from_time, "to": to_time},
+    )
+    assert res_timeseries.status_code == 404
+

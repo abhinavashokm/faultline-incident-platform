@@ -436,3 +436,185 @@ class PerfRepository:
                 ],
             })
         return rows
+
+    async def get_performance_summary(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        from_time: datetime,
+        to_time: datetime,
+        histogram_version: int,
+        environment: str | None = None,
+        release: str | None = None,
+        route: str | None = None,
+        method: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Aggregate total request_count, error_count, and histogram across matching metric buckets.
+
+        Returns None if no matching metric rows exist for the project in this workspace.
+        """
+        table_name = f"{settings.database_schema}.metric_buckets"
+
+        where_clauses = [
+            "workspace_id = :workspace_id",
+            "project_id = :project_id",
+            "bucket_start >= :from_time",
+            "bucket_start < :to_time",
+            "histogram_version = :histogram_version",
+        ]
+        params: dict[str, Any] = {
+            "workspace_id": workspace_id,
+            "project_id": project_id,
+            "from_time": from_time,
+            "to_time": to_time,
+            "histogram_version": histogram_version,
+        }
+
+        if environment is not None:
+            where_clauses.append("environment = :environment")
+            params["environment"] = environment
+
+        if release is not None:
+            where_clauses.append("release = :release")
+            params["release"] = release
+
+        if route is not None and method is not None:
+            where_clauses.append("route_template = :route")
+            where_clauses.append("http_method = :method")
+            params["route"] = route
+            params["method"] = method
+
+        where_sql = " AND ".join(where_clauses)
+
+        sql_stmt = text(f"""
+            SELECT
+                COUNT(*)::bigint AS match_count,
+                COALESCE(SUM(request_count), 0)::bigint AS request_count,
+                COALESCE(SUM(error_count), 0)::bigint AS error_count,
+                COALESCE(SUM(latency_histogram[1]), 0)::bigint AS b1,
+                COALESCE(SUM(latency_histogram[2]), 0)::bigint AS b2,
+                COALESCE(SUM(latency_histogram[3]), 0)::bigint AS b3,
+                COALESCE(SUM(latency_histogram[4]), 0)::bigint AS b4,
+                COALESCE(SUM(latency_histogram[5]), 0)::bigint AS b5,
+                COALESCE(SUM(latency_histogram[6]), 0)::bigint AS b6
+            FROM {table_name}
+            WHERE {where_sql}
+        """)
+
+        result = await self.session.execute(sql_stmt, params)
+        row = result.mappings().one()
+
+        if int(row["match_count"]) == 0:
+            return None
+
+        return {
+            "request_count": int(row["request_count"]),
+            "error_count": int(row["error_count"]),
+            "histogram": [
+                int(row["b1"]),
+                int(row["b2"]),
+                int(row["b3"]),
+                int(row["b4"]),
+                int(row["b5"]),
+                int(row["b6"]),
+            ],
+        }
+
+    async def get_performance_timeseries(
+        self,
+        workspace_id: UUID,
+        project_id: UUID,
+        from_time: datetime,
+        to_time: datetime,
+        interval_seconds: int,
+        histogram_version: int,
+        environment: str | None = None,
+        release: str | None = None,
+        route: str | None = None,
+        method: str | None = None,
+    ) -> list[dict[str, Any]] | None:
+        """Aggregate metric buckets grouped into time windows of size `interval_seconds`.
+
+        Returns None if no matching metric rows exist for the project in this workspace.
+        """
+        table_name = f"{settings.database_schema}.metric_buckets"
+
+        where_clauses = [
+            "workspace_id = :workspace_id",
+            "project_id = :project_id",
+            "bucket_start >= :from_time",
+            "bucket_start < :to_time",
+            "histogram_version = :histogram_version",
+        ]
+        params: dict[str, Any] = {
+            "workspace_id": workspace_id,
+            "project_id": project_id,
+            "from_time": from_time,
+            "to_time": to_time,
+            "histogram_version": histogram_version,
+            "interval_seconds": interval_seconds,
+        }
+
+        if environment is not None:
+            where_clauses.append("environment = :environment")
+            params["environment"] = environment
+
+        if release is not None:
+            where_clauses.append("release = :release")
+            params["release"] = release
+
+        if route is not None and method is not None:
+            where_clauses.append("route_template = :route")
+            where_clauses.append("http_method = :method")
+            params["route"] = route
+            params["method"] = method
+
+        where_sql = " AND ".join(where_clauses)
+
+        # Check project existence in workspace for 404
+        check_stmt = text(f"""
+            SELECT 1 FROM {table_name}
+            WHERE workspace_id = :workspace_id AND project_id = :project_id
+            LIMIT 1
+        """)
+        exists_result = await self.session.execute(check_stmt, {
+            "workspace_id": workspace_id,
+            "project_id": project_id,
+        })
+        if exists_result.scalar_one_or_none() is None:
+            return None
+
+        sql_stmt = text(f"""
+            SELECT
+                to_timestamp(floor(extract(epoch FROM bucket_start) / :interval_seconds) * :interval_seconds) AT TIME ZONE 'UTC' AS time_bucket,
+                COALESCE(SUM(request_count), 0)::bigint AS request_count,
+                COALESCE(SUM(error_count), 0)::bigint AS error_count,
+                COALESCE(SUM(latency_histogram[1]), 0)::bigint AS b1,
+                COALESCE(SUM(latency_histogram[2]), 0)::bigint AS b2,
+                COALESCE(SUM(latency_histogram[3]), 0)::bigint AS b3,
+                COALESCE(SUM(latency_histogram[4]), 0)::bigint AS b4,
+                COALESCE(SUM(latency_histogram[5]), 0)::bigint AS b5,
+                COALESCE(SUM(latency_histogram[6]), 0)::bigint AS b6
+            FROM {table_name}
+            WHERE {where_sql}
+            GROUP BY time_bucket
+            ORDER BY time_bucket ASC
+        """)
+
+        result = await self.session.execute(sql_stmt, params)
+        rows = []
+        for r in result.mappings():
+            rows.append({
+                "time_bucket": r["time_bucket"],
+                "request_count": int(r["request_count"]),
+                "error_count": int(r["error_count"]),
+                "histogram": [
+                    int(r["b1"]),
+                    int(r["b2"]),
+                    int(r["b3"]),
+                    int(r["b4"]),
+                    int(r["b5"]),
+                    int(r["b6"]),
+                ],
+            })
+        return rows
