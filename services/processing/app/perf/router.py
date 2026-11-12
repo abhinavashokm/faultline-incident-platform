@@ -82,7 +82,7 @@ async def list_endpoints(
 
 
 @router.get(
-    "/projects/{project_id}/performance/endpoint",
+    "/projects/{project_id}/performance/endpoint-detail",
     response_model=EndpointDetailResponse,
 )
 async def get_endpoint_detail(

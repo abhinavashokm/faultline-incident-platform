@@ -349,7 +349,7 @@ class PerfRepository:
         sql_stmt = text(f"""
             SELECT kv.key AS status_code, SUM(kv.value::bigint)::bigint AS cnt
             FROM {table_name} mb,
-                 jsonb_each_text(mb.status_counts) AS kv
+                 jsonb_each_text(CASE WHEN jsonb_typeof(mb.status_counts) = 'object' THEN mb.status_counts ELSE '{{}}'::jsonb END) AS kv
             WHERE {where_sql}
             GROUP BY kv.key
         """)

@@ -24,13 +24,13 @@ async def insert_bucket(
     release: str = "v1.0.0",
     request_count: int = 100,
     error_count: int = 5,
-    status_counts: dict | None = None,
+    status_counts: dict | None = ...,  # sentinel to allow passing None explicitly
     latency_histogram: list[int] | None = None,
     histogram_version: int = 1,
 ) -> None:
     if latency_histogram is None:
         latency_histogram = [50, 30, 10, 5, 3, 2]
-    if status_counts is None:
+    if status_counts is ...:
         status_counts = {"200": 95, "500": 5}
 
     async with session_factory() as session:
@@ -163,7 +163,7 @@ async def test_endpoint_detail_missing_params(
     now = datetime(2026, 11, 12, 12, 0, 0, tzinfo=timezone.utc)
     # Missing route and method
     response = await client.get(
-        f"/api/v1/projects/{test_project_id}/performance/endpoint",
+        f"/api/v1/projects/{test_project_id}/performance/endpoint-detail",
         params={
             "from": now.isoformat(),
             "to": (now + timedelta(hours=1)).isoformat(),
@@ -182,7 +182,7 @@ async def test_endpoint_detail_not_found(
 ) -> None:
     now = datetime(2026, 11, 12, 12, 0, 0, tzinfo=timezone.utc)
     response = await client.get(
-        f"/api/v1/projects/{test_project_id}/performance/endpoint",
+        f"/api/v1/projects/{test_project_id}/performance/endpoint-detail",
         params={
             "route": "/missing",
             "method": "GET",
@@ -235,7 +235,7 @@ async def test_endpoint_detail_happy_path_and_null_status_counts(
     to_time = (now + timedelta(hours=1)).isoformat()
 
     response = await client.get(
-        f"/api/v1/projects/{test_project_id}/performance/endpoint",
+        f"/api/v1/projects/{test_project_id}/performance/endpoint-detail",
         params={
             "route": "/orders/{id}",
             "method": "GET",
@@ -305,7 +305,7 @@ async def test_endpoint_detail_release_filter_isolation(
 
     # Filter with release=v1.0.0
     response = await client.get(
-        f"/api/v1/projects/{test_project_id}/performance/endpoint",
+        f"/api/v1/projects/{test_project_id}/performance/endpoint-detail",
         params={
             "route": "/search",
             "method": "GET",
@@ -361,7 +361,7 @@ async def test_workspace_isolation(
 
     # Detail endpoint should return 404
     res_detail = await client.get(
-        f"/api/v1/projects/{test_project_id}/performance/endpoint",
+        f"/api/v1/projects/{test_project_id}/performance/endpoint-detail",
         params={
             "route": "/secret",
             "method": "GET",
@@ -388,7 +388,7 @@ async def test_unauthenticated_request_fails(
     assert res_list.status_code == 401
 
     res_detail = await unauth_client.get(
-        f"/api/v1/projects/{test_project_id}/performance/endpoint",
+        f"/api/v1/projects/{test_project_id}/performance/endpoint-detail",
         params={
             "route": "/anything",
             "method": "GET",
