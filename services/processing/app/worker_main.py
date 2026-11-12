@@ -10,9 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.config import settings
 from app.core.db import SessionLocal, engine
-from app.errors.consumer import build_handler
+from app.errors.consumer import build_handler as build_errors_handler
 from app.errors.service import ErrorsService
 from app.messaging.consumer import run_consumer
+from app.perf.consumer import build_perf_handler
+from app.perf.service import PerfService
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ async def run_errors_worker(stop_event: asyncio.Event | None = None) -> None:
             pass
 
     service = ErrorsService(SessionLocal)
-    handler = build_handler(service)
+    handler = build_errors_handler(service)
 
     try:
         await run_consumer(
@@ -53,13 +55,42 @@ async def run_errors_worker(stop_event: asyncio.Event | None = None) -> None:
         logger.info("Database engine disposed.")
 
 
+async def run_perf_worker(stop_event: asyncio.Event | None = None) -> None:
+    """Run performance consumer worker with graceful shutdown and database cleanup."""
+    if stop_event is None:
+        stop_event = asyncio.Event()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, lambda: stop_event.set())
+        except (NotImplementedError, RuntimeError):
+            pass
+
+    service = PerfService(SessionLocal)
+    handler = build_perf_handler(service)
+
+    try:
+        await run_consumer(
+            topic=settings.performance_metrics_topic,
+            group_id=settings.perf_consumer_group,
+            handler=handler,
+            bootstrap_servers=settings.kafka_bootstrap_servers,
+            stop_event=stop_event,
+        )
+    finally:
+        logger.info("Disposing database engine...")
+        await engine.dispose()
+        logger.info("Database engine disposed.")
+
+
 def main() -> None:
     role = os.getenv("ROLE", "errors").strip().lower()
 
     if role == "perf":
         setup_logging()
-        logger.info("Performance module (ROLE=perf) is not implemented yet. Exiting.")
-        sys.exit(0)
+        logger.info("Starting Processing Service worker with ROLE=perf")
+        asyncio.run(run_perf_worker())
     elif role == "errors":
         setup_logging()
         logger.info("Starting Processing Service worker with ROLE=errors")
