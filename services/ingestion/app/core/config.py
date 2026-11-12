@@ -12,6 +12,10 @@ class Settings(BaseSettings):
         default="error-events",
         description="Kafka topic for error events",
     )
+    kafka_topic_performance_metrics: str = Field(
+        default="performance-metrics",
+        description="Kafka topic for performance metrics",
+    )
     kafka_producer_timeout_seconds: float = Field(
         default=3.0,
         description="Timeout in seconds for Kafka acknowledgment",
