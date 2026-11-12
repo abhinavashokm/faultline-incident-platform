@@ -123,9 +123,9 @@ class Client:
     def close(self, timeout: float | None = None) -> None:
         """Flush remaining events and terminate transport thread."""
         try:
-            from faultline.performance import flush_performance_batch
+            from faultline.performance import close_performance_batcher
 
-            flush_performance_batch(client=self)
+            close_performance_batcher(client=self)
             self.transport.close(timeout=timeout)
         except Exception as err:
             logger.error("Failed to close client: %s", err, exc_info=True)

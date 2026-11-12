@@ -19,6 +19,7 @@ class Config:
     flush_timeout: float = 2.0
     max_payload_bytes: int = 65536
     max_retry_after: float = 10.0
+    performance_flush_interval: float = 10.0
 
     @classmethod
     def from_options(
@@ -46,5 +47,6 @@ class Config:
             flush_timeout=kwargs.get("flush_timeout", 2.0),
             max_payload_bytes=kwargs.get("max_payload_bytes", 65536),
             max_retry_after=kwargs.get("max_retry_after", 10.0),
+            performance_flush_interval=kwargs.get("performance_flush_interval", 10.0),
         )
 

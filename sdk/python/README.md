@@ -99,6 +99,14 @@ app = FaultlineASGIMiddleware(my_asgi_app)
 | `max_retries` | - | `3` | Maximum retry attempts for transient server errors (5xx/network) |
 | `timeout` | - | `5.0` | HTTP request timeout in seconds |
 | `flush_timeout` | - | `2.0` | Default timeout for `flush()` and `close()` |
+| `performance_flush_interval` | - | `10.0` | Background timer flush interval in seconds for batched performance telemetry |
+
+## Performance Monitoring & Histogram Versioning
+
+The SDK aggregates endpoint performance telemetry locally before transmitting batches to the ingestion endpoint:
+- **Histogram Buckets (v1)**: Latencies are grouped into immutable upper bounds `[50, 100, 250, 500, 1000, inf]` (ms) with `histogram_version = 1`.
+- **In-Memory Aggregation**: Metrics are grouped per `(method, route)` with `request_count`, server `error_count` (HTTP 5xx), exact `status_counts` breakdown, and `latency_histogram` bucket counts.
+- **Dual Flush Mechanism**: Flushes automatically when reaching batch size (~50 records), periodically on a background timer (default 10s), and explicitly on `client.flush()` or `client.close()`.
 
 ## Running Tests
 
