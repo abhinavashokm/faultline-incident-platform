@@ -100,3 +100,17 @@ class PerformanceIngestResponse(BaseModel):
 
     accepted: bool = True
     batch_id: UUID
+
+
+class NormalizedPerformanceBatch(BaseModel):
+    """Normalized performance batch payload packaged inside EventEnvelope for Kafka."""
+
+    batch_id: UUID
+    environment: str
+    release: str
+    interval_start: datetime
+    interval_end: datetime
+    metrics: list[RouteMetric] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="ignore")
+

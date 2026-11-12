@@ -5,6 +5,7 @@ from app.schemas.event import (
     StackFrame,
 )
 from app.schemas.performance import (
+    NormalizedPerformanceBatch,
     PerformanceBatchIngestRequest,
     PerformanceIngestResponse,
     RouteMetric,
@@ -15,6 +16,7 @@ __all__ = [
     "IngestResponse",
     "NormalizedErrorEvent",
     "StackFrame",
+    "NormalizedPerformanceBatch",
     "PerformanceBatchIngestRequest",
     "PerformanceIngestResponse",
     "RouteMetric",

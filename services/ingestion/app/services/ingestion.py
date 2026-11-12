@@ -27,6 +27,7 @@ from app.schemas.event import (
     NormalizedErrorEvent,
 )
 from app.schemas.performance import (
+    NormalizedPerformanceBatch,
     PerformanceBatchIngestRequest,
     PerformanceIngestResponse,
 )
@@ -316,11 +317,35 @@ class IngestionService:
             raise ServiceUnavailableError("Server busy", retry_after=1) from exc
 
         try:
-            # 4. Construct server-derived metadata & Kafka payload
-            # PLACEHOLDER: Publishing to Kafka will be implemented in the next step.
-            # Example next step:
-            # envelope = EventEnvelope[NormalizedPerformanceBatch](...)
-            # await self.kafka_producer.publish(topic=settings.kafka_topic_performance_metrics, ...)
+            # 4. Construct server-derived metadata & normalized envelope
+            received_at = datetime.now(timezone.utc)
+            normalized_payload = NormalizedPerformanceBatch(
+                batch_id=request.batch_id,
+                environment=request.environment,
+                release=request.release,
+                interval_start=request.interval_start,
+                interval_end=request.interval_end,
+                metrics=request.metrics,
+            )
+
+            envelope = EventEnvelope[NormalizedPerformanceBatch](
+                schema_version=1,
+                event_id=request.batch_id,
+                workspace_id=resolved.workspace_id,
+                project_id=resolved.project_id,
+                received_at=received_at,
+                payload=normalized_payload,
+            )
+
+            envelope_bytes = envelope.model_dump_json().encode("utf-8")
+            partition_key = str(resolved.project_id).encode("utf-8")
+
+            # 5. Publish to Kafka and await acknowledgment
+            await self.kafka_producer.publish(
+                topic=settings.kafka_topic_performance_metrics,
+                key=partition_key,
+                value=envelope_bytes,
+            )
 
             logger.info(
                 "Performance batch accepted: batch_id=%s project_id=%s workspace_id=%s metrics_count=%d",
@@ -334,6 +359,28 @@ class IngestionService:
                 accepted=True,
                 batch_id=request.batch_id,
             )
+        except KafkaPublishError as exc:
+            log_kafka_failure(
+                logger,
+                event_id=str(request.batch_id),
+                project_id=str(resolved.project_id),
+                error=exc,
+            )
+            raise ServiceUnavailableError(
+                detail="Event could not be queued",
+                retry_after=5,
+            ) from exc
+        except Exception as exc:
+            log_kafka_failure(
+                logger,
+                event_id=str(request.batch_id),
+                project_id=str(resolved.project_id),
+                error=exc,
+            )
+            raise ServiceUnavailableError(
+                detail="Event could not be processed",
+                retry_after=5,
+            ) from exc
         finally:
             self.semaphore.release()
 
