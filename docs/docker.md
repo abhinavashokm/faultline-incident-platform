@@ -92,7 +92,7 @@ Services are grouped by profile so you can start only what you need:
 | Profile | Services started |
 |---|---|
 | *(none)* | postgres, kafka, mailpit, redis (infra always) |
-| `backend` | + migrate, control-plane, ingestion, processing-api, processing-worker |
+| `backend` | + migrate, control-plane, ingestion, processing-api, processing-worker-errors, processing-worker-perf |
 | `frontend` | + frontend |
 
 The root `.env` sets `COMPOSE_PROFILES=backend,frontend` by default, so `docker compose up -d` starts everything.
@@ -117,8 +117,9 @@ postgres (healthy)
     └─► migrate (runs alembic for control-plane + processing, then exits)
             ├─► control-plane (healthy) ──► ingestion
             └─► processing-api
-            └─► processing-worker
-kafka (healthy) ──► ingestion, processing-api, processing-worker
+            └─► processing-worker-errors
+            └─► processing-worker-perf
+kafka (healthy) ──► ingestion, processing-api, processing-worker-errors, processing-worker-perf
 redis (healthy) ──► ingestion
 control-plane (healthy) ──► frontend
 ```
@@ -188,7 +189,7 @@ Shared libraries installed per service:
 |---|---|
 | control-plane | `faultline-auth` |
 | ingestion | `faultline-events` |
-| processing-api / processing-worker | `faultline-auth` |
+| processing-api / processing-worker-errors / processing-worker-perf | `faultline-auth` |
 | migrate | `faultline-auth` (control-plane dep) |
 
 ---

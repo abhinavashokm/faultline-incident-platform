@@ -51,6 +51,25 @@ class Settings(BaseSettings):
         ),
         description="Kafka consumer group ID for errors module",
     )
+    performance_metrics_topic: str = Field(
+        default="performance-metrics",
+        validation_alias=AliasChoices(
+            "processing_performance_metrics_topic",
+            "performance_metrics_topic",
+            "perf_metrics_topic",
+            "kafka_topic_performance_metrics",
+        ),
+        description="Kafka topic for performance metrics",
+    )
+    perf_consumer_group: str = Field(
+        default="processing-perf",
+        validation_alias=AliasChoices(
+            "processing_perf_consumer_group",
+            "perf_consumer_group",
+            "performance_consumer_group",
+        ),
+        description="Kafka consumer group ID for performance module",
+    )
 
     max_retries: int = Field(
         default=3,

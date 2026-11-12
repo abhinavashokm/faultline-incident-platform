@@ -243,11 +243,11 @@ services:
     profiles:
       - backend
 
-  processing-worker:
+  processing-worker-errors:
     build:
       context: .
       dockerfile: services/processing/Dockerfile
-    container_name: processing-worker
+    container_name: processing-worker-errors
     volumes:
       - ./services/processing/app:/app/app
       - ./services/processing/keys:/app/keys:ro
@@ -256,6 +256,35 @@ services:
       - ./services/processing/.env
     environment:
       ROLE: errors
+      PROCESSING_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/processing
+      PROCESSING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      AUTH_PROVIDER: jwks
+      AUTH_JWKS_URL: http://control-plane:8000/.well-known/jwks.json
+      AUTH_ISSUER: faultline-control-plane
+      AUTH_AUDIENCE: faultline
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+    logging: *default-logging
+    restart: unless-stopped
+    profiles:
+      - backend
+
+  processing-worker-perf:
+    build:
+      context: .
+      dockerfile: services/processing/Dockerfile
+    container_name: processing-worker-perf
+    volumes:
+      - ./services/processing/app:/app/app
+      - ./services/processing/keys:/app/keys:ro
+    command: ["python", "-m", "app.worker_main"]
+    env_file:
+      - ./services/processing/.env
+    environment:
+      ROLE: perf
       PROCESSING_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/processing
       PROCESSING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       AUTH_PROVIDER: jwks

@@ -77,6 +77,7 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
       - /api/v1/projects (project CRUD, settings, and api-key)
     - Processing:
       - /api/v1/projects/{project_id}/issues (and sub-paths: events, issue detail)
+      - /api/v1/projects/{project_id}/performance (and sub-paths: endpoints, endpoint detail)
     - Ingestion:
       - /api/v1/ingest (SDK event and performance batch intake)
     
@@ -107,6 +108,13 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
         # Processing service issue endpoints (more specific than /api/v1/projects)
         RouteEntry(
             path_prefix="/api/v1/projects/{project_id}/issues",
+            upstream_base_url=settings.upstream_processing_url,
+            service_name="processing",
+            read_timeout=settings.read_timeout_seconds,
+        ),
+        # Processing service performance endpoints (more specific than /api/v1/projects)
+        RouteEntry(
+            path_prefix="/api/v1/projects/{project_id}/performance",
             upstream_base_url=settings.upstream_processing_url,
             service_name="processing",
             read_timeout=settings.read_timeout_seconds,

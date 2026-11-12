@@ -9,6 +9,7 @@ from faultline_auth import configure_auth
 
 from app.core.config import settings
 from app.errors.router import router as errors_router
+from app.perf.router import router as perf_router
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,9 @@ def create_app() -> FastAPI:
 
     # Include errors module routers
     app.include_router(errors_router, prefix="/api/v1")
+
+    # Include perf module routers
+    app.include_router(perf_router, prefix="/api/v1")
 
     return app
 

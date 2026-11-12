@@ -16,13 +16,19 @@ async def test_longest_prefix_routing_processing_vs_control_plane(
     last_req = mock_upstream.received_requests[-1]
     assert str(last_req.url) == f"http://processing-api:8002/api/v1/projects/{project_id}/issues"
 
-    # 2. Control Plane route: /api/v1/projects/{project_id}
+    # 2. Processing route: /api/v1/projects/{project_id}/performance/endpoints
+    resp_perf = await client.get(f"/api/v1/projects/{project_id}/performance/endpoints")
+    assert resp_perf.status_code == 200
+    last_req = mock_upstream.received_requests[-1]
+    assert str(last_req.url) == f"http://processing-api:8002/api/v1/projects/{project_id}/performance/endpoints"
+
+    # 3. Control Plane route: /api/v1/projects/{project_id}
     resp_proj = await client.get(f"/api/v1/projects/{project_id}")
     assert resp_proj.status_code == 200
     last_req = mock_upstream.received_requests[-1]
     assert str(last_req.url) == f"http://control-plane:8000/api/v1/projects/{project_id}"
 
-    # 3. Control Plane route: /api/v1/projects
+    # 4. Control Plane route: /api/v1/projects
     resp_list = await client.get("/api/v1/projects")
     assert resp_list.status_code == 200
     last_req = mock_upstream.received_requests[-1]
