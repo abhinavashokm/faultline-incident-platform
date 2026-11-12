@@ -26,6 +26,11 @@ from app.schemas.event import (
     IngestResponse,
     NormalizedErrorEvent,
 )
+from app.schemas.performance import (
+    NormalizedPerformanceBatch,
+    PerformanceBatchIngestRequest,
+    PerformanceIngestResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -244,4 +249,139 @@ class IngestionService:
             ) from exc
         finally:
             self.semaphore.release()
+
+    async def ingest_performance_batch(
+        self,
+        request: PerformanceBatchIngestRequest,
+        project_api_key: str | None,
+    ) -> PerformanceIngestResponse:
+        key_prefix = mask_key(project_api_key)
+
+        # 1. Authenticate via project API key
+        if not project_api_key or not project_api_key.strip():
+            log_event_rejected(
+                logger,
+                reason="missing_api_key",
+                status_code=401,
+                key_prefix=key_prefix,
+            )
+            raise AuthenticationError("Missing project key header")
+
+        try:
+            resolved: ResolvedKey = await self.key_resolver.resolve(project_api_key)
+        except InvalidKeyError as exc:
+            log_event_rejected(
+                logger,
+                reason="invalid_or_revoked_key",
+                status_code=401,
+                key_prefix=key_prefix,
+                details=str(exc),
+            )
+            raise AuthenticationError("Invalid or revoked project key") from exc
+        except KeyResolverUnavailableError as exc:
+            log_event_rejected(
+                logger,
+                reason="key_resolver_unavailable",
+                status_code=503,
+                key_prefix=key_prefix,
+                details=str(exc),
+            )
+            raise ServiceUnavailableError(
+                detail="Key resolution service unavailable",
+                retry_after=5,
+            ) from exc
+
+        # 2. Rate limiting check (per project)
+        # Note: Rate limiting is currently optional/disabled per project configuration
+
+        # 3. Bounded in-flight concurrency (backpressure)
+        try:
+            acquired = self.semaphore.locked() is False
+            if acquired:
+                await self.semaphore.acquire()
+            else:
+                log_event_rejected(
+                    logger,
+                    reason="backpressure_saturation",
+                    status_code=503,
+                    key_prefix=key_prefix,
+                    details=f"in_flight_publishes_saturated project_id={resolved.project_id}",
+                )
+                raise ServiceUnavailableError(
+                    detail="Server is handling maximum concurrent requests",
+                    retry_after=1,
+                )
+        except IngestionError:
+            raise
+        except Exception as exc:
+            raise ServiceUnavailableError("Server busy", retry_after=1) from exc
+
+        try:
+            # 4. Construct server-derived metadata & normalized envelope
+            received_at = datetime.now(timezone.utc)
+            normalized_payload = NormalizedPerformanceBatch(
+                batch_id=request.batch_id,
+                environment=request.environment,
+                release=request.release,
+                interval_start=request.interval_start,
+                interval_end=request.interval_end,
+                metrics=request.metrics,
+            )
+
+            envelope = EventEnvelope[NormalizedPerformanceBatch](
+                schema_version=1,
+                event_id=request.batch_id,
+                workspace_id=resolved.workspace_id,
+                project_id=resolved.project_id,
+                received_at=received_at,
+                payload=normalized_payload,
+            )
+
+            envelope_bytes = envelope.model_dump_json().encode("utf-8")
+            partition_key = str(resolved.project_id).encode("utf-8")
+
+            # 5. Publish to Kafka and await acknowledgment
+            await self.kafka_producer.publish(
+                topic=settings.kafka_topic_performance_metrics,
+                key=partition_key,
+                value=envelope_bytes,
+            )
+
+            logger.info(
+                "Performance batch accepted: batch_id=%s project_id=%s workspace_id=%s metrics_count=%d",
+                request.batch_id,
+                resolved.project_id,
+                resolved.workspace_id,
+                len(request.metrics),
+            )
+
+            return PerformanceIngestResponse(
+                accepted=True,
+                batch_id=request.batch_id,
+            )
+        except KafkaPublishError as exc:
+            log_kafka_failure(
+                logger,
+                event_id=str(request.batch_id),
+                project_id=str(resolved.project_id),
+                error=exc,
+            )
+            raise ServiceUnavailableError(
+                detail="Event could not be queued",
+                retry_after=5,
+            ) from exc
+        except Exception as exc:
+            log_kafka_failure(
+                logger,
+                event_id=str(request.batch_id),
+                project_id=str(resolved.project_id),
+                error=exc,
+            )
+            raise ServiceUnavailableError(
+                detail="Event could not be processed",
+                retry_after=5,
+            ) from exc
+        finally:
+            self.semaphore.release()
+
 

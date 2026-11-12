@@ -57,13 +57,23 @@ async def test_routing_ingestion_events(
 ):
     client, mock_upstream = app_with_mock
 
+    # Error event intake
     resp = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json={"event_id": "123", "message": "error"},
         headers={"X-Faultline-Key": "fl_key_123"},
     )
     assert resp.status_code == 200
-    assert str(mock_upstream.received_requests[-1].url) == "http://ingestion:8001/api/v1/events"
+    assert str(mock_upstream.received_requests[-1].url) == "http://ingestion:8001/api/v1/ingest/errors"
+
+    # Performance batch intake
+    resp_perf = await client.post(
+        "/api/v1/ingest/performance",
+        json={"batch_id": "batch-123"},
+        headers={"X-Project-Key": "fl_key_123"},
+    )
+    assert resp_perf.status_code == 200
+    assert str(mock_upstream.received_requests[-1].url) == "http://ingestion:8001/api/v1/ingest/performance"
 
 
 @pytest.mark.asyncio

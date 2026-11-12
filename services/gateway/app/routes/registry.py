@@ -78,7 +78,7 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
     - Processing:
       - /api/v1/projects/{project_id}/issues (and sub-paths: events, issue detail)
     - Ingestion:
-      - /api/v1/events (SDK event intake)
+      - /api/v1/ingest (SDK event and performance batch intake)
     
     Unimplemented future services (commented out / disabled by config):
     - Alerting: /api/v1/projects/{project_id}/alerts
@@ -117,9 +117,9 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
             upstream_base_url=settings.upstream_control_plane_url,
             service_name="control-plane",
         ),
-        # Ingestion service SDK error events intake
+        # Ingestion service SDK error events and performance telemetry intake
         RouteEntry(
-            path_prefix="/api/v1/events",
+            path_prefix="/api/v1/ingest",
             upstream_base_url=settings.upstream_ingestion_url,
             service_name="ingestion",
             read_timeout=settings.ingestion_read_timeout_seconds,

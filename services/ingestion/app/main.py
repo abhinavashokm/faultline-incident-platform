@@ -14,6 +14,7 @@ from app.adapters.key_resolver import CachedHttpProjectKeyResolver
 from app.adapters.redis_limiter import RedisRateLimiter
 from app.api.events import router as events_router
 from app.api.health import router as health_router
+from app.api.performance import router as performance_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.middleware import MaxBodySizeMiddleware, RequestIDMiddleware
@@ -133,6 +134,7 @@ def create_app() -> FastAPI:
     # Routers
     app.include_router(health_router)
     app.include_router(events_router, prefix="/api/v1")
+    app.include_router(performance_router, prefix="/api/v1")
 
     return app
 

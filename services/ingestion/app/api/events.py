@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/events",
+    "/ingest/errors",
     status_code=status.HTTP_202_ACCEPTED,
     response_model=IngestResponse,
 )
