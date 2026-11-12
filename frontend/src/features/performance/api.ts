@@ -1,4 +1,4 @@
-import { apiClient, delay } from "@/lib/api-client";
+import { apiClient, delay, ApiError } from "@/lib/api-client";
 import {
   PerformanceFilterOptions,
   PerformanceSummary,
@@ -11,8 +11,8 @@ import {
 } from "./types";
 
 /**
- * Flag to control mock vs real API calls.
- * Set to false when connecting to the actual Faultline Processing Service.
+ * Flag to control mock vs real API calls for unimplemented endpoints.
+ * Currently keeps endpoint detail mocked until real backend wiring is added.
  */
 export const USE_MOCKS = true;
 
@@ -195,15 +195,6 @@ function generateMockEndpoints(params: PerformanceQueryParams): PerformanceEndpo
  * 1) GET /filters -> filter dropdowns (environment, release, services)
  */
 export async function getFilters(projectId: string): Promise<PerformanceFilterOptions> {
-  if (USE_MOCKS) {
-    await delay(350);
-    return {
-      environments: ["production", "staging"],
-      releases: ["v1.8.0", "v1.7.2", "v1.6.0"],
-      services: ["payments", "auth", "checkout"],
-    };
-  }
-
   return apiClient.get<PerformanceFilterOptions>(
     `/api/v1/projects/${projectId}/performance/filters`,
     { transformCase: false }
@@ -212,28 +203,40 @@ export async function getFilters(projectId: string): Promise<PerformanceFilterOp
 
 /**
  * 2) GET /summary?from&to&environment&release -> KPI cards
+ * Note: If project has no recorded telemetry in the workspace, processing service returns 404.
+ * We catch 404 and return zeroed/empty summary with isNoTelemetry flag so the UI can render
+ * an empty warning state rather than a network error.
  */
 export async function getSummary(
   projectId: string,
   params: PerformanceQueryParams
 ): Promise<PerformanceSummary> {
-  if (USE_MOCKS) {
-    await delay(380);
-    checkMockErrorState(params);
-    return generateMockSummary(params);
-  }
-
   const queryParams: Record<string, string | undefined> = {
     from: params.from,
     to: params.to,
-    environment: params.environment,
-    release: params.release,
+    environment: params.environment || undefined,
+    release: params.release || undefined,
   };
 
-  return apiClient.get<PerformanceSummary>(
-    `/api/v1/projects/${projectId}/performance/summary`,
-    { params: queryParams, transformCase: false }
-  );
+  try {
+    return await apiClient.get<PerformanceSummary>(
+      `/api/v1/projects/${projectId}/performance/summary`,
+      { params: queryParams, transformCase: false }
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return {
+        request_count: 0,
+        error_count: 0,
+        error_rate: 0,
+        p50_ms: 0,
+        p95_ms: 0,
+        p99_ms: 0,
+        is_empty_telemetry: true,
+      };
+    }
+    throw err;
+  }
 }
 
 function generateMockEndpointDetail(params: PerformanceQueryParams): EndpointDetailResponse {
@@ -310,56 +313,67 @@ function generateMockEndpointDetail(params: PerformanceQueryParams): EndpointDet
 
 /**
  * 3) GET /timeseries?from&to&environment&release&route&method -> 3 charts from the same response
+ * Returns empty points array if project has no telemetry in workspace (404).
  */
 export async function getTimeseries(
   projectId: string,
   params: PerformanceQueryParams
 ): Promise<PerformanceTimeseries> {
-  if (USE_MOCKS) {
-    await delay(420);
-    checkMockErrorState(params);
-    return generateMockTimeseries(params);
-  }
-
   const queryParams: Record<string, string | undefined> = {
     from: params.from,
     to: params.to,
-    environment: params.environment,
-    release: params.release,
-    route: params.route,
-    method: params.method,
+    environment: params.environment || undefined,
+    release: params.release || undefined,
+    route: params.route || undefined,
+    method: params.method || undefined,
   };
 
-  return apiClient.get<PerformanceTimeseries>(
-    `/api/v1/projects/${projectId}/performance/timeseries`,
-    { params: queryParams, transformCase: false }
-  );
+  try {
+    return await apiClient.get<PerformanceTimeseries>(
+      `/api/v1/projects/${projectId}/performance/timeseries`,
+      { params: queryParams, transformCase: false }
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return {
+        interval_seconds: getRecommendedIntervalSeconds(params.from, params.to),
+        points: [],
+      };
+    }
+    throw err;
+  }
 }
 
 /**
  * 4) GET /endpoints?from&to&environment&release -> endpoints table
+ * Returns empty items list if project has no telemetry in workspace (404).
  */
 export async function getEndpoints(
   projectId: string,
   params: PerformanceQueryParams
 ): Promise<PerformanceEndpointsResponse> {
-  if (USE_MOCKS) {
-    await delay(450);
-    checkMockErrorState(params);
-    return generateMockEndpoints(params);
-  }
-
   const queryParams: Record<string, string | undefined> = {
     from: params.from,
     to: params.to,
-    environment: params.environment,
-    release: params.release,
+    environment: params.environment || undefined,
+    release: params.release || undefined,
   };
 
-  return apiClient.get<PerformanceEndpointsResponse>(
-    `/api/v1/projects/${projectId}/performance/endpoints`,
-    { params: queryParams, transformCase: false }
-  );
+  try {
+    return await apiClient.get<PerformanceEndpointsResponse>(
+      `/api/v1/projects/${projectId}/performance/endpoints`,
+      { params: queryParams, transformCase: false }
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return {
+        items: [],
+        total: 0,
+        truncated: false,
+      };
+    }
+    throw err;
+  }
 }
 
 /**

@@ -28,7 +28,6 @@ interface EndpointsTableSectionProps {
     environment?: string;
     release?: string;
     range?: string;
-    mockState?: string;
   };
 }
 
@@ -288,9 +287,6 @@ export function EndpointsTableSection({
               if (filterQueryParams?.range) searchParamsObj.set("range", filterQueryParams.range);
               if (filterQueryParams?.environment) searchParamsObj.set("environment", filterQueryParams.environment);
               if (filterQueryParams?.release) searchParamsObj.set("release", filterQueryParams.release);
-              if (filterQueryParams?.mockState && filterQueryParams.mockState !== "normal") {
-                searchParamsObj.set("mockState", filterQueryParams.mockState);
-              }
 
               const targetUrl = `/${workspaceSlug}/${projectSlug}/performance/endpoint?${searchParamsObj.toString()}`;
 

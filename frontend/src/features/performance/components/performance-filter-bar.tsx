@@ -16,8 +16,6 @@ interface PerformanceFilterBarProps {
   onChangeRelease: (rel: string) => void;
   onRefresh: () => void;
   isRefreshing: boolean;
-  mockState?: "normal" | "empty" | "error" | "truncated";
-  onChangeMockState: (state: "normal" | "empty" | "error" | "truncated") => void;
   customFrom: string;
   customTo: string;
   onChangeCustomFrom: (val: string) => void;
@@ -36,8 +34,6 @@ export function PerformanceFilterBar({
   onChangeRelease,
   onRefresh,
   isRefreshing,
-  mockState = "normal",
-  onChangeMockState,
   customFrom,
   customTo,
   onChangeCustomFrom,
@@ -125,27 +121,8 @@ export function PerformanceFilterBar({
           </select>
         </div>
 
-        {/* Right: Refresh button and Mock Simulator switcher */}
+        {/* Right: Refresh button */}
         <div className="flex items-center gap-2.5">
-          {/* Mock State Simulator (allows forcing states) */}
-          <div className="hidden lg:flex items-center p-0.5 rounded-lg bg-surface-container-low border border-border text-xs">
-            <span className="px-2 text-[10px] uppercase font-semibold text-text-secondary">Mock:</span>
-            {(["normal", "empty", "error", "truncated"] as const).map((state) => (
-              <button
-                key={state}
-                onClick={() => onChangeMockState(state)}
-                className={`px-2 py-0.5 rounded text-[11px] capitalize transition-colors ${
-                  mockState === state
-                    ? "bg-card text-primary font-semibold shadow-xs"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                {state}
-              </button>
-            ))}
-          </div>
-
-          {/* Refresh Action */}
           <button
             onClick={onRefresh}
             disabled={isRefreshing}

@@ -49,12 +49,10 @@ function EndpointDetailContent() {
   const initialPreset = (searchParams?.get("range") as PresetRange) || "24h";
   const initialEnv = searchParams?.get("environment") || "";
   const initialRel = searchParams?.get("release") || "";
-  const initialMockState = (searchParams?.get("mockState") as any) || "normal";
 
   const [activePreset, setActivePreset] = useState<PresetRange>(initialPreset);
   const [environment, setEnvironment] = useState<string>(initialEnv);
   const [release, setRelease] = useState<string>(initialRel);
-  const [mockState, setMockState] = useState<"normal" | "empty" | "error" | "truncated">(initialMockState);
 
   // Pinned from/to timestamps
   const [pinnedTimes, setPinnedTimes] = useState<{ from: string; to: string }>(() => {
@@ -101,9 +99,8 @@ function EndpointDetailContent() {
     p.set("to", pinnedTimes.to);
     if (environment) p.set("environment", environment);
     if (release) p.set("release", release);
-    if (mockState !== "normal") p.set("mockState", mockState);
     return `/${workspaceSlug}/${routeProjectSlug || currentProject?.slug || ""}/performance?${p.toString()}`;
-  }, [workspaceSlug, routeProjectSlug, currentProject?.slug, activePreset, pinnedTimes, environment, release, mockState]);
+  }, [workspaceSlug, routeProjectSlug, currentProject?.slug, activePreset, pinnedTimes, environment, release]);
 
   // Update URL search params
   const updateUrlParams = useCallback(
@@ -113,7 +110,6 @@ function EndpointDetailContent() {
       to?: string;
       environment?: string;
       release?: string;
-      mockState?: string;
     }) => {
       const current = new URLSearchParams(searchParams?.toString() || "");
       if (newParams.range) current.set("range", newParams.range);
@@ -125,12 +121,6 @@ function EndpointDetailContent() {
 
       if (newParams.release) current.set("release", newParams.release);
       else if (newParams.release === "") current.delete("release");
-
-      if (newParams.mockState && newParams.mockState !== "normal") {
-        current.set("mockState", newParams.mockState);
-      } else {
-        current.delete("mockState");
-      }
 
       router.replace(`?${current.toString()}`, { scroll: false });
     },
@@ -175,11 +165,6 @@ function EndpointDetailContent() {
     updateUrlParams({ release: rel });
   };
 
-  const handleChangeMockState = (state: "normal" | "empty" | "error" | "truncated") => {
-    setMockState(state);
-    updateUrlParams({ mockState: state });
-  };
-
   // Build query params
   const queryParams: PerformanceQueryParams = useMemo(() => {
     return {
@@ -189,9 +174,8 @@ function EndpointDetailContent() {
       release: release || undefined,
       route: routeParam || undefined,
       method: methodParam || undefined,
-      mockState: mockState,
     };
-  }, [pinnedTimes, environment, release, routeParam, methodParam, mockState]);
+  }, [pinnedTimes, environment, release, routeParam, methodParam]);
 
   // 1) Parallel Call: Filters
   const { data: filtersData } = usePerformanceFilters(projectId);
@@ -278,8 +262,6 @@ function EndpointDetailContent() {
           onChangeRelease={handleChangeRelease}
           onRefresh={handleRefresh}
           isRefreshing={isRefreshing}
-          mockState={mockState}
-          onChangeMockState={handleChangeMockState}
           customFrom={customFrom}
           customTo={customTo}
           onChangeCustomFrom={setCustomFrom}

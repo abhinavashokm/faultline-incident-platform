@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, AlertTriangle, RefreshCw } from "lucide-react";
 import { PerformanceSummary } from "../types";
 
 interface KpiData {
@@ -11,6 +11,7 @@ interface KpiData {
   p50_ms: number;
   p95_ms: number;
   p99_ms: number;
+  is_empty_telemetry?: boolean;
 }
 
 interface KpiCardsSectionProps {
@@ -99,25 +100,43 @@ export function KpiCardsSection({
     { label: "p99", value: formatLatency(data?.p99_ms ?? 0) },
   ];
 
+  const isNoTelemetry = data?.is_empty_telemetry;
+
   return (
-    <div className={`grid grid-cols-2 sm:grid-cols-3 ${hideErrorsCount ? "lg:grid-cols-5" : "lg:grid-cols-6"} gap-3.5`}>
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className="bg-card p-4 rounded-2xl border border-border shadow-xs flex flex-col justify-between"
-        >
-          <div className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
-            {item.label}
+    <div className="space-y-3">
+      {isNoTelemetry && (
+        <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500 flex-shrink-0">
+            <AlertTriangle className="w-4 h-4" />
           </div>
-          <div
-            className={`mt-2 text-2xl font-bold font-mono tracking-tight tabular-nums ${
-              item.highlight || "text-text-primary"
-            }`}
-          >
-            {item.value}
+          <div>
+            <h4 className="text-xs font-semibold text-text-primary">No telemetry found for this project</h4>
+            <p className="text-[11px] text-text-secondary">
+              No performance data has been received yet. Check if something is wrong with your SDK setup or ingestion configuration.
+            </p>
           </div>
         </div>
-      ))}
+      )}
+
+      <div className={`grid grid-cols-2 sm:grid-cols-3 ${hideErrorsCount ? "lg:grid-cols-5" : "lg:grid-cols-6"} gap-3.5`}>
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="bg-card p-4 rounded-2xl border border-border shadow-xs flex flex-col justify-between"
+          >
+            <div className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+              {item.label}
+            </div>
+            <div
+              className={`mt-2 text-2xl font-bold font-mono tracking-tight tabular-nums ${
+                item.highlight || "text-text-primary"
+              }`}
+            >
+              {item.value}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

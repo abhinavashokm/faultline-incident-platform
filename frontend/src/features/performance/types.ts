@@ -11,6 +11,7 @@ export interface PerformanceSummary {
   p50_ms: number;
   p95_ms: number;
   p99_ms: number;
+  is_empty_telemetry?: boolean;
 }
 
 export interface TimeseriesPoint {

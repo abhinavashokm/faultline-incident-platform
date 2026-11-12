@@ -54,12 +54,10 @@ function PerformanceOverviewContent() {
   const initialPreset = (searchParams?.get("range") as PresetRange) || "24h";
   const initialEnv = searchParams?.get("environment") || "";
   const initialRel = searchParams?.get("release") || "";
-  const initialMockState = (searchParams?.get("mockState") as any) || "normal";
 
   const [activePreset, setActivePreset] = useState<PresetRange>(initialPreset);
   const [environment, setEnvironment] = useState<string>(initialEnv);
   const [release, setRelease] = useState<string>(initialRel);
-  const [mockState, setMockState] = useState<"normal" | "empty" | "error" | "truncated">(initialMockState);
 
   // Pinned from/to timestamps (computed once on user selection)
   const [pinnedTimes, setPinnedTimes] = useState<{ from: string; to: string }>(() => {
@@ -99,7 +97,6 @@ function PerformanceOverviewContent() {
       to?: string;
       environment?: string;
       release?: string;
-      mockState?: string;
     }) => {
       const current = new URLSearchParams(searchParams?.toString() || "");
       if (newParams.range) current.set("range", newParams.range);
@@ -111,12 +108,6 @@ function PerformanceOverviewContent() {
 
       if (newParams.release) current.set("release", newParams.release);
       else if (newParams.release === "") current.delete("release");
-
-      if (newParams.mockState && newParams.mockState !== "normal") {
-        current.set("mockState", newParams.mockState);
-      } else {
-        current.delete("mockState");
-      }
 
       router.replace(`?${current.toString()}`, { scroll: false });
     },
@@ -163,11 +154,6 @@ function PerformanceOverviewContent() {
     updateUrlParams({ release: rel });
   };
 
-  const handleChangeMockState = (state: "normal" | "empty" | "error" | "truncated") => {
-    setMockState(state);
-    updateUrlParams({ mockState: state });
-  };
-
   // Common query params for parallel calls
   const queryParams: PerformanceQueryParams = useMemo(() => {
     return {
@@ -175,9 +161,8 @@ function PerformanceOverviewContent() {
       to: pinnedTimes.to,
       environment: environment || undefined,
       release: release || undefined,
-      mockState: mockState,
     };
-  }, [pinnedTimes, environment, release, mockState]);
+  }, [pinnedTimes, environment, release]);
 
   // 1) Parallel independent call: Filters
   const { data: filtersData } = usePerformanceFilters(projectId);
@@ -255,8 +240,6 @@ function PerformanceOverviewContent() {
           onChangeRelease={handleChangeRelease}
           onRefresh={handleRefresh}
           isRefreshing={isRefreshing}
-          mockState={mockState}
-          onChangeMockState={handleChangeMockState}
           customFrom={customFrom}
           customTo={customTo}
           onChangeCustomFrom={setCustomFrom}
@@ -295,7 +278,6 @@ function PerformanceOverviewContent() {
             range: activePreset,
             environment: environment || undefined,
             release: release || undefined,
-            mockState: mockState,
           }}
         />
       </div>
