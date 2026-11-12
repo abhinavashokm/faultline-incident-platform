@@ -243,11 +243,11 @@ services:
     profiles:
       - backend
 
-  processing-worker:
+  processing-worker-errors:
     build:
       context: .
       dockerfile: services/processing/Dockerfile
-    container_name: processing-worker
+    container_name: processing-worker-errors
     volumes:
       - ./services/processing/app:/app/app
       - ./services/processing/keys:/app/keys:ro
