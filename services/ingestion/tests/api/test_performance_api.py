@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -32,12 +33,8 @@ async def test_ingest_performance_batch_happy_path_202(
                     "404": 5,
                     "500": 5,
                 },
-                "latency_histogram": {
-                    "le_100ms": 20,
-                    "le_300ms": 50,
-                    "le_1s": 25,
-                    "gt_1s": 5,
-                },
+                "histogram_version": 1,
+                "latency_histogram": [20, 50, 15, 10, 3, 2],
             }
         ],
     }
@@ -58,7 +55,11 @@ async def test_ingest_performance_batch_happy_path_202(
     topic, key, val = fake_kafka.published_messages[0]
     assert topic == "performance-metrics"
     assert key is not None
-    assert str(batch_id) in val.decode("utf-8")
+    payload_str = val.decode("utf-8")
+    assert str(batch_id) in payload_str
+    published_json = json.loads(payload_str)
+    assert published_json["payload"]["metrics"][0]["histogram_version"] == 1
+    assert published_json["payload"]["metrics"][0]["latency_histogram"] == [20, 50, 15, 10, 3, 2]
 
 
 @pytest.mark.asyncio
@@ -131,6 +132,8 @@ async def test_ingest_performance_batch_negative_counts_422(
                 "method": "GET",
                 "request_count": -1,
                 "error_count": 0,
+                "histogram_version": 1,
+                "latency_histogram": [0, 0, 0, 0, 0, 0],
             }
         ],
     }
@@ -187,4 +190,3 @@ async def test_ingest_performance_batch_kafka_failure_returns_503(
     assert response.status_code == 503
     assert response.headers.get("Retry-After") == "5"
     assert response.json()["detail"] == "Event could not be queued"
-

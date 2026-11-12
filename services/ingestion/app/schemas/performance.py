@@ -2,7 +2,10 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
+
+from app.histograms import HISTOGRAM_BUCKETS
 
 # Method regex pattern or uppercase validator
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
@@ -19,9 +22,10 @@ class RouteMetric(BaseModel):
         default_factory=dict,
         description="HTTP status code counts, e.g. {'200': 90, '500': 5}",
     )
-    latency_histogram: dict[str, int] = Field(
-        default_factory=dict,
-        description="Latency histogram counts, e.g. {'le_100ms': 20, 'gt_1s': 5}",
+    histogram_version: int = Field(..., description="Histogram version defining bucket boundaries")
+    latency_histogram: list[int] = Field(
+        ...,
+        description="Latency histogram bucket counts matching the histogram version boundaries",
     )
 
     model_config = ConfigDict(extra="ignore")
@@ -31,7 +35,7 @@ class RouteMetric(BaseModel):
     def normalize_method(cls, v: str) -> str:
         v = v.strip().upper()
         if len(v) > 10:
-            raise ValueError("method must be at most 10 characters")
+            raise PydanticCustomError("value_error", "method must be at most 10 characters")
         return v
 
     @field_validator("route")
@@ -39,7 +43,7 @@ class RouteMetric(BaseModel):
     def normalize_route(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("route cannot be empty")
+            raise PydanticCustomError("value_error", "route cannot be empty")
         return v
 
     @field_validator("status_counts")
@@ -47,16 +51,47 @@ class RouteMetric(BaseModel):
     def validate_status_counts(cls, v: dict[str, int]) -> dict[str, int]:
         for code, count in v.items():
             if count < 0:
-                raise ValueError(f"status count for {code} cannot be negative")
+                raise PydanticCustomError(
+                    "value_error", f"status count for {code} cannot be negative"
+                )
+        return v
+
+    @field_validator("histogram_version")
+    @classmethod
+    def validate_histogram_version(cls, v: int) -> int:
+        if v not in HISTOGRAM_BUCKETS:
+            raise PydanticCustomError(
+                "value_error",
+                f"Unknown histogram_version {v}. Supported versions: {sorted(HISTOGRAM_BUCKETS.keys())}",
+            )
         return v
 
     @field_validator("latency_histogram")
     @classmethod
-    def validate_latency_histogram(cls, v: dict[str, int]) -> dict[str, int]:
-        for bucket, count in v.items():
+    def validate_latency_histogram_counts(cls, v: list[int]) -> list[int]:
+        for count in v:
             if count < 0:
-                raise ValueError(f"histogram count for {bucket} cannot be negative")
+                raise PydanticCustomError(
+                    "value_error", f"Histogram count cannot be negative: {count}"
+                )
         return v
+
+    @model_validator(mode="after")
+    def validate_histogram_buckets(self) -> "RouteMetric":
+        version = self.histogram_version
+        if version not in HISTOGRAM_BUCKETS:
+            raise PydanticCustomError(
+                "value_error",
+                f"Unknown histogram_version {version}. Supported versions: {sorted(HISTOGRAM_BUCKETS.keys())}",
+            )
+        expected_len = len(HISTOGRAM_BUCKETS[version])
+        actual_len = len(self.latency_histogram)
+        if actual_len != expected_len:
+            raise PydanticCustomError(
+                "value_error",
+                f"latency_histogram length ({actual_len}) does not match expected length ({expected_len}) for histogram_version {version}",
+            )
+        return self
 
 
 class PerformanceBatchIngestRequest(BaseModel):
@@ -81,7 +116,7 @@ class PerformanceBatchIngestRequest(BaseModel):
         if not v:
             return "production"
         if len(v) > 100:
-            raise ValueError("environment must be at most 100 characters")
+            raise PydanticCustomError("value_error", "environment must be at most 100 characters")
         return v
 
     @field_validator("release")
@@ -91,7 +126,7 @@ class PerformanceBatchIngestRequest(BaseModel):
         if not v:
             return "unknown"
         if len(v) > 150:
-            raise ValueError("release must be at most 150 characters")
+            raise PydanticCustomError("value_error", "release must be at most 150 characters")
         return v
 
 
@@ -113,4 +148,3 @@ class NormalizedPerformanceBatch(BaseModel):
     metrics: list[RouteMetric] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
-
