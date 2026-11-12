@@ -35,7 +35,7 @@ async def test_ingest_event_happy_path_202(
     }
 
     response = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": test_project_api_key},
     )
@@ -84,7 +84,7 @@ async def test_client_supplied_project_id_is_ignored(
     }
 
     response = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": test_project_api_key},
     )
@@ -109,13 +109,13 @@ async def test_auth_failure_missing_or_bad_key(client: AsyncClient):
     }
 
     # Missing header -> 401
-    resp_missing = await client.post("/api/v1/events", json=payload)
+    resp_missing = await client.post("/api/v1/ingest/errors", json=payload)
     assert resp_missing.status_code == 401
     assert "detail" in resp_missing.json()
 
     # Invalid key -> 401
     resp_invalid = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": "invalid_unknown_key"},
     )
@@ -143,7 +143,7 @@ async def test_auth_failure_revoked_key(
     }
 
     response = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": revoked_key},
     )
@@ -163,7 +163,7 @@ async def test_schema_validation_error_422(
     }
 
     response = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": test_project_api_key},
     )
@@ -186,7 +186,7 @@ async def test_payload_too_large_413(
     }
 
     response = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": test_project_api_key},
     )
@@ -209,7 +209,7 @@ async def test_rate_limit_exceeded_429(
     }
 
     response = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": test_project_api_key},
     )
@@ -233,7 +233,7 @@ async def test_kafka_failure_returns_503(
     }
 
     response = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": test_project_api_key},
     )
@@ -257,7 +257,7 @@ async def test_resolver_down_and_cold_cache_returns_503(
     }
 
     response = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Faultline-Key": test_project_api_key},
     )
@@ -301,7 +301,7 @@ async def test_backpressure_saturation_returns_503(
             "exception_type": "BackpressureError",
         }
         response = await ac.post(
-            "/api/v1/events",
+            "/api/v1/ingest/errors",
             json=payload,
             headers={"X-Faultline-Key": test_project_api_key},
         )
@@ -323,7 +323,7 @@ async def test_header_fallbacks(
 
     # 1. Fallback via X-Project-Key
     resp1 = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"X-Project-Key": test_project_api_key},
     )
@@ -332,7 +332,7 @@ async def test_header_fallbacks(
     # 2. Fallback via Authorization Bearer
     payload["event_id"] = str(uuid.uuid4())
     resp2 = await client.post(
-        "/api/v1/events",
+        "/api/v1/ingest/errors",
         json=payload,
         headers={"Authorization": f"Bearer {test_project_api_key}"},
     )
@@ -381,31 +381,31 @@ async def test_control_plane_error_mappings_through_api(fake_kafka, fake_limiter
 
         # 1. Control Plane 404 -> Ingestion 401
         mock_http.get.return_value = httpx.Response(404, json={"detail": "Project key not found"})
-        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-404"})
+        resp = await ac.post("/api/v1/ingest/errors", json=payload, headers={"X-Faultline-Key": "test-key-404"})
         assert resp.status_code == 401
         assert "Invalid or revoked project key" in resp.json()["detail"]
 
         # 2. Control Plane 401 -> Ingestion 503 + Retry-After
         mock_http.get.return_value = httpx.Response(401, json={"detail": "Missing or invalid service token"})
-        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-401"})
+        resp = await ac.post("/api/v1/ingest/errors", json=payload, headers={"X-Faultline-Key": "test-key-401"})
         assert resp.status_code == 503
         assert resp.headers.get("Retry-After") == "5"
 
         # 3. Control Plane 403 -> Ingestion 503 + Retry-After
         mock_http.get.return_value = httpx.Response(403, json={"detail": "Forbidden"})
-        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-403"})
+        resp = await ac.post("/api/v1/ingest/errors", json=payload, headers={"X-Faultline-Key": "test-key-403"})
         assert resp.status_code == 503
         assert resp.headers.get("Retry-After") == "5"
 
         # 4. Control Plane 500 -> Ingestion 503 + Retry-After
         mock_http.get.return_value = httpx.Response(500, text="Internal Server Error")
-        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-500"})
+        resp = await ac.post("/api/v1/ingest/errors", json=payload, headers={"X-Faultline-Key": "test-key-500"})
         assert resp.status_code == 503
         assert resp.headers.get("Retry-After") == "5"
 
         # 5. Connection Error -> Ingestion 503 + Retry-After
         mock_http.get.side_effect = httpx.ConnectError("Failed to connect")
-        resp = await ac.post("/api/v1/events", json=payload, headers={"X-Faultline-Key": "test-key-conn"})
+        resp = await ac.post("/api/v1/ingest/errors", json=payload, headers={"X-Faultline-Key": "test-key-conn"})
         assert resp.status_code == 503
         assert resp.headers.get("Retry-After") == "5"
 
