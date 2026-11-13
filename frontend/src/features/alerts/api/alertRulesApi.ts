@@ -197,7 +197,7 @@ export async function createAlertRule(
   ).map((c) => ({
     id: c.id,
     name: c.name,
-    channel_type: c.channel_type,
+    channel_type: (c.channelType || c.channel_type || "email") as "email",
   }));
 
   const newRule: AlertRule = {

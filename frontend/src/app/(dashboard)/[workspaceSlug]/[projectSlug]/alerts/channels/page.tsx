@@ -313,7 +313,7 @@ export default function NotificationChannelsPage() {
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-muted text-xs font-mono uppercase text-foreground">
-                        {channel.channel_type}
+                        {channel.channelType || channel.channel_type || "email"}
                       </span>
                     </td>
                     <td className="py-4 px-4">
@@ -338,11 +338,13 @@ export default function NotificationChannelsPage() {
                       </span>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap text-xs text-muted-foreground">
-                      {channel.created_at ? (
+                      {channel.createdAt || channel.created_at ? (
                         <div className="flex items-center gap-1.5">
                           <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
                           <span>
-                            {new Date(channel.created_at).toLocaleDateString("en-US", {
+                            {new Date(
+                              (channel.createdAt || channel.created_at)!
+                            ).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
                               year: "numeric",

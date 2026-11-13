@@ -7,10 +7,12 @@ export type RuleType = "new_issue";
 export interface NotificationChannel {
   id: string; // uuid
   name: string;
-  channel_type: "email";
+  channel_type?: "email";
+  channelType?: "email";
   destination: string;
   enabled: boolean;
   created_at?: string;
+  createdAt?: string;
 }
 
 export interface CreateNotificationChannelPayload {

@@ -163,7 +163,7 @@ export function NotificationChannelSelect({
                     </div>
                   </div>
                   <span className="text-label-sm font-mono uppercase text-text-muted shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-surface-container">
-                    {channel.channel_type}
+                    {channel.channelType || channel.channel_type || "email"}
                   </span>
                 </div>
               );
