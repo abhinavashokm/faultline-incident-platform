@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronRight,
   Plus,
@@ -10,7 +11,6 @@ import {
   Bell,
   AlertTriangle,
   Loader2,
-  CheckCircle2,
   ShieldCheck,
   Zap,
 } from "lucide-react";
@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
+import { useProjectBySlug } from "@/features/projects/hooks";
 import { AlertRulesList } from "@/features/alerts/components/alert-rules-list";
 import {
   listAlertRules,
@@ -29,45 +30,52 @@ import { AlertRule } from "@/features/alerts/types";
 export default function AlertRulesPage() {
   const params = useParams();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const workspaceSlug = (params?.workspaceSlug as string) || "";
   const projectSlug = (params?.projectSlug as string) || "";
+
+  const { project, isLoading: isProjectLoading } = useProjectBySlug(projectSlug);
+  const projectId = project?.id;
 
   const alertsHref = `/${workspaceSlug}/${projectSlug}/alerts`;
   const createRuleHref = `/${workspaceSlug}/${projectSlug}/alerts/rules/new`;
 
-  const [rules, setRules] = useState<AlertRule[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Fetch alert rules with React Query
+  const {
+    data: rules = [],
+    isLoading: isRulesLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["alert-rules", projectId],
+    queryFn: () => listAlertRules(projectId!),
+    enabled: Boolean(projectId),
+  });
 
-  const fetchRules = async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const data = await listAlertRules();
-      setRules(data);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load alert rules";
-      setLoadError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const isLoading = isProjectLoading || (Boolean(projectId) && isRulesLoading);
+  const loadError = isError
+    ? error instanceof Error
+      ? error.message
+      : "Failed to load alert rules"
+    : null;
 
-  useEffect(() => {
-    fetchRules();
-  }, []);
-
-  const handleDeleteRule = async (id: string) => {
-    try {
-      await deleteAlertRule(id);
-      setRules((prev) => prev.filter((r) => r.id !== id));
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => {
+      if (!projectId) throw new Error("Project ID is missing");
+      return deleteAlertRule(projectId, id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alert-rules", projectId] });
       toast({
         title: "Rule deleted",
         description: "The alert rule has been removed successfully.",
         variant: "default",
       });
-    } catch (err: unknown) {
+    },
+    onError: (err: unknown) => {
       const message =
         err instanceof Error ? err.message : "Failed to delete alert rule";
       toast({
@@ -75,13 +83,17 @@ export default function AlertRulesPage() {
         description: message,
         variant: "destructive",
       });
-    }
-  };
+    },
+  });
 
-  const handleToggleRule = async (id: string) => {
-    try {
-      const updated = await toggleAlertRule(id);
-      setRules((prev) => prev.map((r) => (r.id === id ? updated : r)));
+  // Toggle mutation
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => {
+      if (!projectId) throw new Error("Project ID is missing");
+      return toggleAlertRule(projectId, id, enabled);
+    },
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["alert-rules", projectId] });
       toast({
         title: updated.enabled ? "Rule activated" : "Rule disabled",
         description: `Rule "${updated.name}" is now ${
@@ -89,7 +101,8 @@ export default function AlertRulesPage() {
         }.`,
         variant: "default",
       });
-    } catch (err: unknown) {
+    },
+    onError: (err: unknown) => {
       const message =
         err instanceof Error ? err.message : "Failed to update alert rule";
       toast({
@@ -97,7 +110,17 @@ export default function AlertRulesPage() {
         description: message,
         variant: "destructive",
       });
-    }
+    },
+  });
+
+  const handleDeleteRule = async (id: string) => {
+    await deleteMutation.mutateAsync(id);
+  };
+
+  const handleToggleRule = (id: string) => {
+    const rule = rules.find((r) => r.id === id);
+    if (!rule) return;
+    toggleMutation.mutate({ id, enabled: !rule.enabled });
   };
 
   const activeRulesCount = rules.filter((r) => r.enabled).length;
@@ -216,7 +239,7 @@ export default function AlertRulesPage() {
           <p className="text-sm text-muted-foreground max-w-md mb-6">
             {loadError}
           </p>
-          <Button variant="outline" onClick={fetchRules}>
+          <Button variant="outline" onClick={() => refetch()}>
             Retry
           </Button>
         </div>

@@ -9,6 +9,9 @@ from sqlalchemy.sql import func
 
 from app.core.config import settings
 from app.core.db import Base
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.delivery.models import AlertRuleChannel
 
 SCHEMA = settings.database_schema
 
@@ -41,6 +44,9 @@ class AlertRule(Base):
         DateTime(timezone=False), nullable=True, onupdate=func.now()
     )
 
+    channel_associations: Mapped[list["AlertRuleChannel"]] = relationship(
+        "AlertRuleChannel", back_populates="rule", cascade="all, delete-orphan"
+    )
     states: Mapped[list["AlertState"]] = relationship("AlertState", back_populates="rule")
     alerts: Mapped[list["Alert"]] = relationship("Alert", back_populates="rule")
 

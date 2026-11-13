@@ -5,10 +5,18 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class AlertRuleChannelResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    channel_type: str
+
+
 class AlertRuleBase(BaseModel):
     name: str = Field(..., max_length=150)
     rule_type: str = Field(..., max_length=50)
-    conditions: dict[str, Any]
+    conditions: dict[str, Any] = Field(default_factory=dict)
     recovery_conditions: dict[str, Any] | None = None
     severity: str = Field(default="warning", max_length=30)
     environment: str | None = Field(default=None, max_length=100)
@@ -19,7 +27,7 @@ class AlertRuleBase(BaseModel):
 
 
 class AlertRuleCreate(AlertRuleBase):
-    pass
+    channel_ids: list[UUID] = Field(default_factory=list)
 
 
 class AlertRuleUpdate(BaseModel):
@@ -33,6 +41,7 @@ class AlertRuleUpdate(BaseModel):
     minimum_event_count: int | None = None
     window_seconds: int | None = None
     cooldown_seconds: int | None = None
+    channel_ids: list[UUID] | None = None
 
 
 class AlertRuleResponse(AlertRuleBase):
@@ -41,6 +50,7 @@ class AlertRuleResponse(AlertRuleBase):
     id: UUID
     project_id: UUID
     created_by: UUID | None = None
+    channels: list[AlertRuleChannelResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime | None = None
 

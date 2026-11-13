@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  Bell,
   Radio,
   Plus,
   Loader2,
@@ -15,38 +15,37 @@ import {
 import { Button } from "@/components/ui/button";
 import { CreateAlertRuleForm } from "@/features/alerts/components/create-alert-rule-form";
 import { listChannels } from "@/features/alerts/api/alertRulesApi";
-import { NotificationChannel } from "@/features/alerts/types";
+import { useProjectBySlug } from "@/features/projects/hooks";
 
 export default function CreateAlertRulePage() {
   const params = useParams();
   const workspaceSlug = (params?.workspaceSlug as string) || "";
   const projectSlug = (params?.projectSlug as string) || "";
 
+  const { project, isLoading: isProjectLoading } = useProjectBySlug(projectSlug);
+  const projectId = project?.id;
+
   const alertsListHref = `/${workspaceSlug}/${projectSlug}/alerts/rules`;
   const channelsHref = `/${workspaceSlug}/${projectSlug}/alerts/channels`;
 
-  const [channels, setChannels] = useState<NotificationChannel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const {
+    data: channels = [],
+    isLoading: isChannelsLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["notification-channels", projectId],
+    queryFn: () => listChannels(projectId!),
+    enabled: Boolean(projectId),
+  });
 
-  const fetchChannels = async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const data = await listChannels();
-      setChannels(data);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load notification channels";
-      setLoadError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchChannels();
-  }, []);
+  const isLoading = isProjectLoading || (Boolean(projectId) && isChannelsLoading);
+  const loadError = isError
+    ? error instanceof Error
+      ? error.message
+      : "Failed to load notification channels"
+    : null;
 
   return (
     <div className="flex-1 space-y-6 p-6 max-w-4xl mx-auto">
@@ -92,12 +91,12 @@ export default function CreateAlertRulePage() {
           <p className="text-sm text-muted-foreground max-w-md mb-5">
             {loadError}
           </p>
-          <Button variant="outline" onClick={fetchChannels}>
+          <Button variant="outline" onClick={() => refetch()}>
             Try again
           </Button>
         </div>
       ) : channels.length === 0 ? (
-        /* Empty State: If mock channel list is empty */
+        /* Empty State: If channel list is empty */
         <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center animate-in fade-in-50 bg-card">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
             <Radio className="h-8 w-8" />
@@ -117,7 +116,7 @@ export default function CreateAlertRulePage() {
         </div>
       ) : (
         /* Active Form */
-        <CreateAlertRuleForm channels={channels} />
+        <CreateAlertRuleForm projectId={projectId!} channels={channels} />
       )}
     </div>
   );

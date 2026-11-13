@@ -35,10 +35,11 @@ import {
 import { createAlertRule } from "../api/alertRulesApi";
 
 interface CreateAlertRuleFormProps {
+  projectId: string;
   channels: NotificationChannel[];
 }
 
-export function CreateAlertRuleForm({ channels }: CreateAlertRuleFormProps) {
+export function CreateAlertRuleForm({ projectId, channels }: CreateAlertRuleFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -95,7 +96,7 @@ export function CreateAlertRuleForm({ channels }: CreateAlertRuleFormProps) {
     console.log("Submitting alert rule payload:", payload);
 
     try {
-      const response = await createAlertRule(payload);
+      const response = await createAlertRule(projectId, payload);
       console.log("Alert rule created successfully:", response);
 
       toast({

@@ -57,7 +57,7 @@ export default function NotificationChannelsPage() {
     refetch,
   } = useQuery({
     queryKey: ["notification-channels", projectId],
-    queryFn: () => listChannels(projectId),
+    queryFn: () => listChannels(projectId!),
     enabled: Boolean(projectId),
   });
 

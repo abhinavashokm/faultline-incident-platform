@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from faultline_auth import configure_auth
@@ -39,7 +40,7 @@ def create_app() -> FastAPI:
     ) -> JSONResponse:
         return JSONResponse(
             status_code=422,
-            content={"detail": exc.errors()},
+            content={"detail": jsonable_encoder(exc.errors())},
         )
 
     @app.get("/health", tags=["health"])
