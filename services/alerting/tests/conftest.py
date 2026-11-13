@@ -17,6 +17,7 @@ from sqlalchemy.pool import NullPool
 from faultline_auth import Principal, get_principal
 from app.core.config import settings
 from app.core.db import get_session
+from app.delivery.email import EmailSender, get_email_sender
 from app.main import create_app
 
 TEST_DB_URL = os.getenv(
@@ -74,10 +75,40 @@ async def db_session(
         yield session
 
 
+class FakeEmailSender:
+    def __init__(self, should_fail: bool = False) -> None:
+        self.sent_emails: list[dict[str, str]] = []
+        self.should_fail = should_fail
+
+    async def send(
+        self,
+        to_email: str,
+        subject: str,
+        text_body: str,
+        html_body: str,
+    ) -> None:
+        if self.should_fail:
+            raise ConnectionError("SMTP server down")
+        self.sent_emails.append(
+            {
+                "to_email": to_email,
+                "subject": subject,
+                "text_body": text_body,
+                "html_body": html_body,
+            }
+        )
+
+
+@pytest.fixture
+def fake_email_sender() -> FakeEmailSender:
+    return FakeEmailSender()
+
+
 @pytest_asyncio.fixture
 async def client(
     session_factory: async_sessionmaker[AsyncSession],
     auth_principal: Principal,
+    fake_email_sender: FakeEmailSender,
 ) -> AsyncIterator[AsyncClient]:
     """Client with authenticated principal dependency pre-configured."""
     app = create_app()
@@ -88,6 +119,7 @@ async def client(
 
     app.dependency_overrides[get_session] = _test_get_session
     app.dependency_overrides[get_principal] = lambda: auth_principal
+    app.dependency_overrides[get_email_sender] = lambda: fake_email_sender
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

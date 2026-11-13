@@ -91,5 +91,37 @@ class Settings(BaseSettings):
         description="Logging level",
     )
 
+    # SMTP Configuration (Mailpit by default in dev)
+    smtp_host: str = Field(
+        default="localhost",
+        validation_alias=AliasChoices("alerting_smtp_host", "smtp_host"),
+        description="SMTP server host",
+    )
+    smtp_port: int = Field(
+        default=1025,
+        validation_alias=AliasChoices("alerting_smtp_port", "smtp_port"),
+        description="SMTP server port",
+    )
+    smtp_username: str = Field(
+        default="",
+        validation_alias=AliasChoices("alerting_smtp_username", "smtp_username"),
+        description="SMTP username (empty for no auth)",
+    )
+    smtp_password: str = Field(
+        default="",
+        validation_alias=AliasChoices("alerting_smtp_password", "smtp_password"),
+        description="SMTP password",
+    )
+    smtp_use_tls: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("alerting_smtp_use_tls", "smtp_use_tls", "smtp_starttls"),
+        description="Whether to use STARTTLS for SMTP",
+    )
+    email_from: str = Field(
+        default="no-reply@faultline.local",
+        validation_alias=AliasChoices("alerting_email_from", "email_from", "smtp_from"),
+        description="From address for outgoing emails",
+    )
+
 
 settings = Settings()

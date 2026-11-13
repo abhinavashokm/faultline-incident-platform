@@ -194,6 +194,28 @@ Shared libraries installed per service:
 
 ---
 
+## Verifying Notification Channel Confirmation Emails with Mailpit
+
+Faultline uses [Mailpit](https://github.com/axllent/mailpit) as a local SMTP sink.
+
+When an email notification channel is created:
+1. Ensure Mailpit is running (`docker compose up -d mailpit`).
+2. Create an email notification channel:
+   ```bash
+   curl -X POST http://localhost:8000/api/v1/projects/<project_id>/notification-channels \
+     -H "Authorization: Bearer <token>" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Dev On-Call",
+       "channel_type": "email",
+       "destination": "devs@faultline.io",
+       "enabled": true
+     }'
+   ```
+3. Open http://localhost:8025 in your browser to view the confirmation email captured by Mailpit.
+
+---
+
 ## Known Gaps
 
 - **No CORSMiddleware** is present in any backend service. If the frontend needs to call the APIs directly from the browser (not via a proxy), CORS headers must be added to control-plane, ingestion, and processing-api.

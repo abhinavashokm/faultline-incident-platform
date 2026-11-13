@@ -321,6 +321,8 @@ services:
     environment:
       ALERTING_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/alerting
       ALERTING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ALERTING_SMTP_HOST: mailpit
+      ALERTING_SMTP_PORT: 1025
       AUTH_PROVIDER: jwks
       AUTH_JWKS_URL: http://control-plane:8000/.well-known/jwks.json
       AUTH_ISSUER: faultline-control-plane
@@ -333,6 +335,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
       interval: 10s

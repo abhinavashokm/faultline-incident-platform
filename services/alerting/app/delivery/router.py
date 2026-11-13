@@ -1,11 +1,12 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from faultline_auth import Principal, get_principal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.delivery.email import EmailSender, get_email_sender
 from app.delivery.schemas import (
     DeliveryResponse,
     NotificationChannelCreate,
@@ -43,12 +44,20 @@ async def list_notification_channels(
 async def create_notification_channel(
     project_id: UUID,
     channel_in: NotificationChannelCreate,
+    background_tasks: BackgroundTasks,
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
+    email_sender: EmailSender = Depends(get_email_sender),
 ) -> NotificationChannelResponse:
     """Create a new notification channel for a project."""
     service = NotificationChannelService(session)
-    channel = await service.create_channel(project_id, channel_in)
+    channel = await service.create_channel(
+        project_id=project_id,
+        channel_in=channel_in,
+        creator_id=principal.user_id,
+        background_tasks=background_tasks,
+        email_sender=email_sender,
+    )
     return NotificationChannelResponse.model_validate(channel)
 
 
