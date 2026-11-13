@@ -117,10 +117,10 @@ export default function AlertRulesPage() {
     await deleteMutation.mutateAsync(id);
   };
 
-  const handleToggleRule = (id: string) => {
+  const handleToggleRule = async (id: string) => {
     const rule = rules.find((r) => r.id === id);
     if (!rule) return;
-    toggleMutation.mutate({ id, enabled: !rule.enabled });
+    await toggleMutation.mutateAsync({ id, enabled: !rule.enabled });
   };
 
   const activeRulesCount = rules.filter((r) => r.enabled).length;

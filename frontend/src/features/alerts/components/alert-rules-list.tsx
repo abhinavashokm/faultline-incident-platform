@@ -16,7 +16,7 @@ import { AlertRule } from "../types";
 interface AlertRulesListProps {
   rules: AlertRule[];
   onDeleteRule?: (id: string) => Promise<void>;
-  onToggleRule?: (id: string) => void;
+  onToggleRule?: (id: string) => Promise<void> | void;
 }
 
 export function AlertRulesList({
@@ -25,6 +25,7 @@ export function AlertRulesList({
   onToggleRule,
 }: AlertRulesListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [ruleToDelete, setRuleToDelete] = useState<AlertRule | null>(null);
 
   const confirmDelete = async () => {
@@ -35,6 +36,16 @@ export function AlertRulesList({
     } finally {
       setDeletingId(null);
       setRuleToDelete(null);
+    }
+  };
+
+  const handleToggle = async (ruleId: string) => {
+    if (!onToggleRule || togglingId) return;
+    setTogglingId(ruleId);
+    try {
+      await onToggleRule(ruleId);
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -160,20 +171,25 @@ export function AlertRulesList({
                     <td className="py-4 px-4 whitespace-nowrap">
                       <button
                         type="button"
-                        onClick={() => onToggleRule && onToggleRule(rule.id)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        disabled={togglingId === rule.id}
+                        onClick={() => handleToggle(rule.id)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all border ${
                           rule.enabled
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-                            : "bg-muted text-muted-foreground hover:bg-muted/80"
-                        }`}
-                        title="Click to toggle status"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                            : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                        } ${togglingId === rule.id ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                        title={rule.enabled ? "Click to disable rule" : "Click to enable rule"}
                       >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            rule.enabled ? "bg-emerald-500" : "bg-muted-foreground"
-                          }`}
-                        />
-                        {rule.enabled ? "Active" : "Disabled"}
+                        {togglingId === rule.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              rule.enabled ? "bg-emerald-500" : "bg-muted-foreground"
+                            }`}
+                          />
+                        )}
+                        <span>{rule.enabled ? "Enabled" : "Disabled"}</span>
                       </button>
                     </td>
 
@@ -187,23 +203,40 @@ export function AlertRulesList({
 
                     {/* Row Actions */}
                     <td className="py-4 px-4 whitespace-nowrap text-right">
-                      {onDeleteRule && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={isDeleting}
-                          onClick={() => setRuleToDelete(rule)}
-                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
-                          title="Delete alert rule"
-                        >
-                          {isDeleting ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                          <span className="sr-only">Delete</span>
-                        </Button>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {onToggleRule && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={togglingId === rule.id}
+                            onClick={() => handleToggle(rule.id)}
+                            className="h-8 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+                            title={rule.enabled ? "Disable rule" : "Enable rule"}
+                          >
+                            {togglingId === rule.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                            ) : null}
+                            {rule.enabled ? "Disable" : "Enable"}
+                          </Button>
+                        )}
+                        {onDeleteRule && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isDeleting}
+                            onClick={() => setRuleToDelete(rule)}
+                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                            title="Delete alert rule"
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                            <span className="sr-only">Delete</span>
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
