@@ -11,6 +11,7 @@ export default function AlertsPage() {
   const workspaceSlug = (params?.workspaceSlug as string) || "";
   const projectSlug = (params?.projectSlug as string) || "";
   const channelsHref = `/${workspaceSlug}/${projectSlug}/alerts/channels`;
+  const createAlertHref = `/${workspaceSlug}/${projectSlug}/alerts/new`;
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -37,10 +38,12 @@ export default function AlertsPage() {
           </Button>
           <Button
             className="gap-2"
-            onClick={() => {}}
+            asChild
           >
-            <Plus className="h-4 w-4" />
-            Create new alert
+            <Link href={createAlertHref}>
+              <Plus className="h-4 w-4" />
+              Create new alert
+            </Link>
           </Button>
         </div>
       </div>
@@ -69,10 +72,12 @@ export default function AlertsPage() {
           </Button>
           <Button
             className="gap-2"
-            onClick={() => {}}
+            asChild
           >
-            <Plus className="h-4 w-4" />
-            Create new alert
+            <Link href={createAlertHref}>
+              <Plus className="h-4 w-4" />
+              Create new alert
+            </Link>
           </Button>
         </div>
       </div>
