@@ -43,10 +43,6 @@ class Settings(BaseSettings):
         default="http://investigation:8005",
         description="Base URL for Investigation service",
     )
-    enable_alerting: bool = Field(
-        default=False,
-        description="Enable routing to Alerting service",
-    )
     enable_incident: bool = Field(
         default=False,
         description="Enable routing to Incident service",

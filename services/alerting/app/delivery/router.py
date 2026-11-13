@@ -1,13 +1,19 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
 from faultline_auth import Principal, get_principal
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.db import get_session
 from app.delivery.schemas import (
     DeliveryResponse,
     NotificationChannelCreate,
     NotificationChannelResponse,
 )
+from app.delivery.service import NotificationChannelService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["notifications"])
 
@@ -20,9 +26,12 @@ router = APIRouter(tags=["notifications"])
 async def list_notification_channels(
     project_id: UUID,
     principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
 ) -> list[NotificationChannelResponse]:
-    """List notification channels for a project."""
-    return []
+    """List notification channels for a project ordered by created_at desc."""
+    service = NotificationChannelService(session)
+    channels = await service.list_channels(project_id)
+    return [NotificationChannelResponse.model_validate(c) for c in channels]
 
 
 @router.post(
@@ -35,9 +44,12 @@ async def create_notification_channel(
     project_id: UUID,
     channel_in: NotificationChannelCreate,
     principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
 ) -> NotificationChannelResponse:
-    """Create a new notification channel."""
-    raise NotImplementedError("Channel creation will be wired in the service implementation")
+    """Create a new notification channel for a project."""
+    service = NotificationChannelService(session)
+    channel = await service.create_channel(project_id, channel_in)
+    return NotificationChannelResponse.model_validate(channel)
 
 
 @router.delete(

@@ -1,29 +1,48 @@
+import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# Standard RFC 5322 simplified email validation pattern
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
 
-class NotificationChannelBase(BaseModel):
-    name: str = Field(..., max_length=150)
-    channel_type: str = Field(..., max_length=30)
-    destination: str
-    secret_reference: str | None = Field(default=None, max_length=255)
-    enabled: bool = True
+class NotificationChannelCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=150)
+    channel_type: Literal["email"] = Field(..., description="Only email channel type is supported")
+    destination: str = Field(..., description="Recipient email address")
+    enabled: bool = Field(default=True)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError("Name cannot be empty or whitespace only")
+        if len(trimmed) > 150:
+            raise ValueError("Name must be at most 150 characters")
+        return trimmed
+
+    @field_validator("destination")
+    @classmethod
+    def validate_destination_email(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not EMAIL_REGEX.match(trimmed):
+            raise ValueError("Invalid email address format")
+        return trimmed
 
 
-class NotificationChannelCreate(NotificationChannelBase):
-    credentials: str | None = None
-
-
-class NotificationChannelResponse(NotificationChannelBase):
+class NotificationChannelResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    project_id: UUID
+    name: str
+    channel_type: str
+    destination: str
+    enabled: bool
     created_at: datetime
-    updated_at: datetime | None = None
 
 
 class DeliveryAttemptResponse(BaseModel):

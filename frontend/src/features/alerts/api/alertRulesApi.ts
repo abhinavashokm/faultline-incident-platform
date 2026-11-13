@@ -1,5 +1,7 @@
+import { apiClient } from "@/lib/api-client";
 import {
   NotificationChannel,
+  CreateNotificationChannelPayload,
   AlertRule,
   CreateAlertRulePayload,
 } from "../types";
@@ -99,17 +101,39 @@ let mockAlertRules: AlertRule[] = [
 ];
 
 /**
- * List notification channels.
- * Filters for channels where enabled = true.
+ * List notification channels for a project.
+ * Uses real backend API call.
  */
-export async function listChannels(): Promise<NotificationChannel[]> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
+export async function listChannels(
+  projectId?: string
+): Promise<NotificationChannel[]> {
   if (MOCK_CONFIG.MOCK_EMPTY_CHANNELS) {
     return [];
   }
 
+  if (projectId) {
+    return apiClient.get<NotificationChannel[]>(
+      `/api/v1/projects/${projectId}/notification-channels`
+    );
+  }
+
+  // Fallback for mock contexts where projectId is not passed
+  await new Promise((resolve) => setTimeout(resolve, 300));
   return INITIAL_MOCK_CHANNELS.filter((channel) => channel.enabled);
+}
+
+/**
+ * Create a new notification channel for a project.
+ * Uses real backend API call.
+ */
+export async function createChannel(
+  projectId: string,
+  payload: CreateNotificationChannelPayload
+): Promise<NotificationChannel> {
+  return apiClient.post<NotificationChannel>(
+    `/api/v1/projects/${projectId}/notification-channels`,
+    payload
+  );
 }
 
 /**

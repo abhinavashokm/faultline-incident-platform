@@ -10,6 +10,14 @@ export interface NotificationChannel {
   channel_type: "email";
   destination: string;
   enabled: boolean;
+  created_at?: string;
+}
+
+export interface CreateNotificationChannelPayload {
+  name: string;
+  channel_type: "email";
+  destination: string;
+  enabled?: boolean;
 }
 
 export interface AlertRuleChannel {
