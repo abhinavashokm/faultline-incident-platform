@@ -14,6 +14,8 @@ WORKDIR /build
 # ── Install shared libs ───────────────────────────────────────────────────────
 COPY libs/faultline-auth /build/libs/faultline-auth
 RUN pip install /build/libs/faultline-auth
+COPY libs/events /build/libs/events
+RUN pip install /build/libs/events
 
 # ── Install control-plane (for its alembic env + models) ─────────────────────
 COPY services/control-plane /app/control-plane
@@ -22,6 +24,10 @@ RUN pip install /app/control-plane
 # ── Install processing (for its alembic env + models) ────────────────────────
 COPY services/processing /app/processing
 RUN pip install /app/processing
+
+# ── Install alerting (for its alembic env + models) ──────────────────────────
+COPY services/alerting /app/alerting
+RUN pip install /app/alerting
 
 # ── Migration entrypoint script ───────────────────────────────────────────────
 COPY deploy/migrate/migrate.sh /migrate.sh

@@ -9,6 +9,8 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from faultline_events import IssueCreatedEvent, IssueCreatedPayload
+
 from app.core.config import settings
 from app.errors.cursor import (
     decode_event_cursor,
@@ -22,6 +24,7 @@ from app.errors.fingerprint import (
     derive_culprit,
     derive_title,
 )
+from app.errors.publisher import IssueEventPublisher
 from app.errors.repository import ErrorsRepository
 from app.errors.schemas import (
     ErrorEventPayload,
@@ -82,11 +85,16 @@ def cap_context(context: dict[str, Any] | None, max_bytes: int) -> dict[str, Any
 class ErrorsService:
     """Owns business rules, normalization, fingerprinting, and database transaction boundaries.
 
-    Does not know about Kafka.
+    Does not know about Kafka, but can publish domain issue events via IssueEventPublisher.
     """
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        publisher: IssueEventPublisher | None = None,
+    ) -> None:
         self.session_factory = session_factory
+        self.publisher = publisher
 
     async def process_event(
         self,
@@ -184,13 +192,41 @@ class ErrorsService:
                         release=payload.release[:150] if payload.release else None,
                     )
 
-                return ProcessedEventResult(
-                    event_id=envelope.event_id,
-                    project_id=envelope.project_id,
+        # 4. Post-commit: Publish issue.created event if this was a new issue
+        if is_new and self.publisher:
+            # Deterministic/stable event_id for this newly created issue
+            issue_event_id = uuid.uuid5(uuid.NAMESPACE_OID, f"issue.created:{issue_id}")
+            issue_event = IssueCreatedEvent(
+                event_id=issue_event_id,
+                workspace_id=envelope.workspace_id,
+                project_id=envelope.project_id,
+                occurred_at=payload.occurred_at,
+                payload=IssueCreatedPayload(
                     issue_id=issue_id,
-                    is_new=is_new,
-                    inserted=inserted,
+                    title=title,
+                    level=level,
+                    environment=environment,
+                    release=payload.release[:150] if payload.release else None,
+                    first_seen=payload.occurred_at,
+                ),
+            )
+            try:
+                await self.publisher.publish_issue_created(issue_event)
+            except Exception as pub_exc:
+                logger.error(
+                    "Failed to publish issue.created event after commit: issue_id=%s event_id=%s: %s",
+                    issue_id,
+                    issue_event_id,
+                    pub_exc,
                 )
+
+        return ProcessedEventResult(
+            event_id=envelope.event_id,
+            project_id=envelope.project_id,
+            issue_id=issue_id,
+            is_new=is_new,
+            inserted=inserted,
+        )
 
 
 class ErrorsHttpService:

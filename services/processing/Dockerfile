@@ -15,9 +15,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /build
 
-# Install shared lib: faultline-auth
+# Install shared libs: faultline-auth and faultline-events
 COPY libs/faultline-auth /build/libs/faultline-auth
 RUN pip install /build/libs/faultline-auth
+COPY libs/events /build/libs/events
+RUN pip install /build/libs/events
 
 # Install processing service
 COPY services/processing /build/service

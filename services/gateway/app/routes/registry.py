@@ -119,6 +119,31 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
             service_name="processing",
             read_timeout=settings.read_timeout_seconds,
         ),
+        # Alerting service endpoints (more specific than /api/v1/projects)
+        RouteEntry(
+            path_prefix="/api/v1/projects/{project_id}/notification-channels",
+            upstream_base_url=settings.upstream_alerting_url,
+            service_name="alerting",
+            read_timeout=settings.read_timeout_seconds,
+        ),
+        RouteEntry(
+            path_prefix="/api/v1/projects/{project_id}/notification-deliveries",
+            upstream_base_url=settings.upstream_alerting_url,
+            service_name="alerting",
+            read_timeout=settings.read_timeout_seconds,
+        ),
+        RouteEntry(
+            path_prefix="/api/v1/projects/{project_id}/alert-rules",
+            upstream_base_url=settings.upstream_alerting_url,
+            service_name="alerting",
+            read_timeout=settings.read_timeout_seconds,
+        ),
+        RouteEntry(
+            path_prefix="/api/v1/projects/{project_id}/alerts",
+            upstream_base_url=settings.upstream_alerting_url,
+            service_name="alerting",
+            read_timeout=settings.read_timeout_seconds,
+        ),
         # Control Plane project management endpoints
         RouteEntry(
             path_prefix="/api/v1/projects",
@@ -135,15 +160,6 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
     ]
 
     # Future / unreleased services (disabled by config)
-    if settings.enable_alerting:
-        routes.append(
-            RouteEntry(
-                path_prefix="/api/v1/projects/{project_id}/alerts",
-                upstream_base_url=settings.upstream_alerting_url,
-                service_name="alerting",
-            )
-        )
-
     if settings.enable_incident:
         routes.append(
             RouteEntry(

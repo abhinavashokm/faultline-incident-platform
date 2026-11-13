@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings
 from app.core.db import SessionLocal, engine
 from app.errors.consumer import build_handler as build_errors_handler
+from app.errors.publisher import AIOKafkaIssueEventPublisher
 from app.errors.service import ErrorsService
 from app.messaging.consumer import run_consumer
 from app.perf.consumer import build_perf_handler
@@ -38,10 +39,15 @@ async def run_errors_worker(stop_event: asyncio.Event | None = None) -> None:
         except (NotImplementedError, RuntimeError):
             pass
 
-    service = ErrorsService(SessionLocal)
+    publisher = AIOKafkaIssueEventPublisher(
+        bootstrap_servers=settings.kafka_bootstrap_servers,
+        topic=settings.issue_events_topic,
+    )
+    service = ErrorsService(SessionLocal, publisher=publisher)
     handler = build_errors_handler(service)
 
     try:
+        await publisher.start()
         await run_consumer(
             topic=settings.error_events_topic,
             group_id=settings.errors_consumer_group,
@@ -50,6 +56,8 @@ async def run_errors_worker(stop_event: asyncio.Event | None = None) -> None:
             stop_event=stop_event,
         )
     finally:
+        logger.info("Stopping issue event publisher...")
+        await publisher.stop()
         logger.info("Disposing database engine...")
         await engine.dispose()
         logger.info("Database engine disposed.")

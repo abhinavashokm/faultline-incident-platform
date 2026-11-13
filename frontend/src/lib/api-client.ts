@@ -273,5 +273,38 @@ export const apiClient = {
 
     return handleResponse<T>(response, transform);
   },
+
+  async delete<T = void>(
+    path: string,
+    options?: RequestOptions
+  ): Promise<T> {
+    const response = await fetch(buildUrl(path), {
+      credentials: "include",
+      ...options,
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildAuthHeaders(),
+        ...options?.headers,
+      },
+    });
+
+    if (response.status === 401 && !options?._retried && !isAuthEndpoint(path)) {
+      await refreshAccessToken();
+      return apiClient.delete<T>(path, { ...options, _retried: true });
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message = extractErrorMessage(errorData, response.statusText);
+      throw new ApiError(response.status, message, errorData);
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return handleResponse<T>(response, options?.transformCase ?? true);
+  },
 };
 

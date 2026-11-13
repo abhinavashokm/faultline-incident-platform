@@ -70,6 +70,15 @@ class Settings(BaseSettings):
         ),
         description="Kafka consumer group ID for performance module",
     )
+    issue_events_topic: str = Field(
+        default="issue-events",
+        validation_alias=AliasChoices(
+            "processing_issue_events_topic",
+            "issue_events_topic",
+            "kafka_topic_issue_events",
+        ),
+        description="Kafka topic for issue events",
+    )
 
     max_retries: int = Field(
         default=3,
