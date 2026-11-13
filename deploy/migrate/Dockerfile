@@ -14,6 +14,8 @@ WORKDIR /build
 # ── Install shared libs ───────────────────────────────────────────────────────
 COPY libs/faultline-auth /build/libs/faultline-auth
 RUN pip install /build/libs/faultline-auth
+COPY libs/events /build/libs/events
+RUN pip install /build/libs/events
 
 # ── Install control-plane (for its alembic env + models) ─────────────────────
 COPY services/control-plane /app/control-plane

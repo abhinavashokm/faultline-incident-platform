@@ -85,3 +85,17 @@ class AlertRuleRepository:
             self.session.add(assoc)
         await self.session.flush()
 
+    async def list_enabled_by_project(self, project_id: uuid.UUID) -> Sequence[AlertRule]:
+        """Fetch all enabled alert rules for a project with channels preloaded."""
+        query = (
+            select(AlertRule)
+            .where(AlertRule.project_id == project_id, AlertRule.enabled.is_(True))
+            .options(
+                selectinload(AlertRule.channel_associations).selectinload(
+                    AlertRuleChannel.channel
+                )
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+

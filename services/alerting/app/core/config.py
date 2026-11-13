@@ -117,10 +117,18 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("alerting_smtp_use_tls", "smtp_use_tls", "smtp_starttls"),
         description="Whether to use STARTTLS for SMTP",
     )
+    # Frontend base URL for links in notifications (e.g. http://localhost:3000)
     email_from: str = Field(
         default="no-reply@faultline.local",
         validation_alias=AliasChoices("alerting_email_from", "email_from", "smtp_from"),
         description="From address for outgoing emails",
+    )
+    frontend_base_url: str = Field(
+        default="http://localhost:3000",
+        validation_alias=AliasChoices(
+            "alerting_frontend_base_url", "frontend_base_url", "app_url"
+        ),
+        description="Frontend base URL for generating links to issues/alerts",
     )
 
 

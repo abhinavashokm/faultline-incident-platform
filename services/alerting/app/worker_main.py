@@ -8,8 +8,11 @@ from pathlib import Path
 # Ensure service root is in sys.path when executed directly as a script
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.alerts.consumer_handler import build_alerts_consumer_handler
+from app.alerts.evaluation_service import AlertEvaluationService
 from app.core.config import settings
-from app.core.db import engine
+from app.core.db import SessionLocal, engine
+from app.delivery.outbox_processor import OutboxDeliveryService
 from app.messaging.consumer import run_consumer
 
 logger = logging.getLogger(__name__)
@@ -34,14 +37,14 @@ async def run_alerts_worker(stop_event: asyncio.Event | None = None) -> None:
         except (NotImplementedError, RuntimeError):
             pass
 
-    async def dummy_handler(msg: bytes, topic: str, partition: int, offset: int) -> None:
-        logger.debug("Received event on %s partition=%d offset=%d", topic, partition, offset)
+    evaluation_service = AlertEvaluationService(SessionLocal)
+    handler = build_alerts_consumer_handler(evaluation_service)
 
     try:
         await run_consumer(
             topic=settings.issue_events_topic,
             group_id=settings.alerts_consumer_group,
-            handler=dummy_handler,
+            handler=handler,
             bootstrap_servers=settings.kafka_bootstrap_servers,
             stop_event=stop_event,
         )
@@ -63,13 +66,22 @@ async def run_delivery_worker(stop_event: asyncio.Event | None = None) -> None:
         except (NotImplementedError, RuntimeError):
             pass
 
+    delivery_service = OutboxDeliveryService(SessionLocal)
     logger.info("Starting delivery worker outbox loop...")
     try:
         while not stop_event.is_set():
             try:
+                processed_count = await delivery_service.process_batch(limit=50)
+                if processed_count > 0:
+                    logger.debug("Processed %d outbox deliveries", processed_count)
+                    # Don't sleep if there might be more immediate work
+                    continue
+            except Exception as exc:
+                logger.error("Error processing delivery outbox batch: %s", exc)
+
+            try:
                 await asyncio.wait_for(stop_event.wait(), timeout=settings.delivery_poll_interval_seconds)
             except asyncio.TimeoutError:
-                # Poll outbox here in future implementation
                 pass
     finally:
         logger.info("Disposing database engine...")

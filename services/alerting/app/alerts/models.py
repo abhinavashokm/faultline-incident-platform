@@ -126,3 +126,21 @@ class Alert(Base):
 
     rule: Mapped["AlertRule"] = relationship("AlertRule", back_populates="alerts")
     state: Mapped["AlertState"] = relationship("AlertState", back_populates="alerts")
+
+
+class ProcessedEvent(Base):
+    """Tracks consumed Kafka events for deduplication and idempotency."""
+
+    __tablename__ = "processed_events"
+    __table_args__ = (
+        Index("ix_alerting_processed_events_processed_at", "processed_at"),
+        {"schema": SCHEMA},
+    )
+
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
