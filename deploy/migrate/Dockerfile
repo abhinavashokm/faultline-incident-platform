@@ -23,6 +23,10 @@ RUN pip install /app/control-plane
 COPY services/processing /app/processing
 RUN pip install /app/processing
 
+# ── Install alerting (for its alembic env + models) ──────────────────────────
+COPY services/alerting /app/alerting
+RUN pip install /app/alerting
+
 # ── Migration entrypoint script ───────────────────────────────────────────────
 COPY deploy/migrate/migrate.sh /migrate.sh
 RUN chmod +x /migrate.sh
