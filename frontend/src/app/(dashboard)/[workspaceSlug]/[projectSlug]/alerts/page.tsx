@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Bell, Plus, Radio } from "lucide-react";
+import { Bell, Radio, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AlertsPage() {
@@ -11,7 +11,7 @@ export default function AlertsPage() {
   const workspaceSlug = (params?.workspaceSlug as string) || "";
   const projectSlug = (params?.projectSlug as string) || "";
   const channelsHref = `/${workspaceSlug}/${projectSlug}/alerts/channels`;
-  const createAlertHref = `/${workspaceSlug}/${projectSlug}/alerts/new`;
+  const rulesHref = `/${workspaceSlug}/${projectSlug}/alerts/rules`;
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -22,7 +22,7 @@ export default function AlertsPage() {
             Alerts
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure alert rules and manage notification destinations for {projectSlug || "your project"}.
+            View fired alerts and manage notification destinations for {projectSlug || "your project"}.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -40,24 +40,24 @@ export default function AlertsPage() {
             className="gap-2"
             asChild
           >
-            <Link href={createAlertHref}>
-              <Plus className="h-4 w-4" />
-              Create new alert
+            <Link href={rulesHref}>
+              <SlidersHorizontal className="h-4 w-4" />
+              Manage rules
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* Dummy Placeholder Content */}
+      {/* Empty State / Fired Alerts Placeholder */}
       <div className="flex min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center animate-in fade-in-50">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
           <Bell className="h-8 w-8" />
         </div>
         <h2 className="text-lg font-semibold text-foreground mb-1">
-          No alert rules configured yet
+          No alerts yet. Create a rule to get notified.
         </h2>
         <p className="text-sm text-muted-foreground max-w-md mb-6">
-          Set up alerts to get notified when error spikes, performance regressions, or critical failures occur in real time.
+          Set up automated alert rules to trigger when issues, spikes, or error regressions occur in real time.
         </p>
         <div className="flex items-center gap-3">
           <Button
@@ -74,9 +74,9 @@ export default function AlertsPage() {
             className="gap-2"
             asChild
           >
-            <Link href={createAlertHref}>
-              <Plus className="h-4 w-4" />
-              Create new alert
+            <Link href={rulesHref}>
+              <SlidersHorizontal className="h-4 w-4" />
+              Manage rules
             </Link>
           </Button>
         </div>

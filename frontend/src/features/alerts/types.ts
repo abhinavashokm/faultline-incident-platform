@@ -12,6 +12,23 @@ export interface NotificationChannel {
   enabled: boolean;
 }
 
+export interface AlertRuleChannel {
+  id: string;
+  name: string;
+  channel_type: "email";
+}
+
+export interface AlertRule {
+  id: string; // uuid
+  name: string;
+  rule_type: "new_issue";
+  environment: string | null;
+  severity: "info" | "warning" | "critical";
+  enabled: boolean;
+  channels: AlertRuleChannel[];
+  created_at: string; // ISO 8601
+}
+
 export interface CreateAlertRulePayload {
   name: string;
   rule_type: "new_issue";
