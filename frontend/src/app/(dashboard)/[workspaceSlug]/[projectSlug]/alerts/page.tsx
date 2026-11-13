@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Bell, Plus, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ export default function AlertsPage() {
   const params = useParams();
   const workspaceSlug = (params?.workspaceSlug as string) || "";
   const projectSlug = (params?.projectSlug as string) || "";
+  const channelsHref = `/${workspaceSlug}/${projectSlug}/alerts/channels`;
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -26,10 +28,12 @@ export default function AlertsPage() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => {}}
+            asChild
           >
-            <Radio className="h-4 w-4" />
-            Manage notification channels
+            <Link href={channelsHref}>
+              <Radio className="h-4 w-4" />
+              Manage notification channels
+            </Link>
           </Button>
           <Button
             className="gap-2"
@@ -56,10 +60,12 @@ export default function AlertsPage() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => {}}
+            asChild
           >
-            <Radio className="h-4 w-4" />
-            Manage notification channels
+            <Link href={channelsHref}>
+              <Radio className="h-4 w-4" />
+              Manage notification channels
+            </Link>
           </Button>
           <Button
             className="gap-2"
