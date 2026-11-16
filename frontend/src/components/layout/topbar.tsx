@@ -29,6 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useListProjects } from "@/features/projects/hooks";
+import { useCurrentUser } from "@/features/auth/hooks";
+import { useAuth } from "@/features/auth/auth-context";
 
 interface TopbarProps {
   workspaceSlug: string;
@@ -43,6 +45,8 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
   const urlProjectSlug = params?.projectSlug as string | undefined;
 
   const { data: projects, isLoading: projectsLoading } = useListProjects();
+  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
+  const { logout } = useAuth();
   const [selectedProject, setSelectedProject] = useState<string>(urlProjectSlug || "");
   const [projectSelectOpen, setProjectSelectOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -112,8 +116,15 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
     }
   };
 
-  const handleLogout = () => {
-    router.push("/login");
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return "U";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
   const onNewProject = () => {
@@ -245,14 +256,11 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
             aria-expanded={userMenuOpen}
           >
             <div className="h-7 w-7 rounded-full bg-primary-tint border border-primary/20 flex items-center justify-center text-primary font-semibold text-[12px] font-mono">
-              EV
+              {userLoading ? "..." : getInitials(currentUser?.full_name)}
             </div>
             <div className="hidden lg:flex flex-col text-left">
               <span className="text-label-md font-semibold text-text-primary leading-none">
-                Elena Vance
-              </span>
-              <span className="text-[10px] text-text-secondary font-mono leading-none mt-0.5">
-                Lead SRE
+                {currentUser?.full_name ?? "User"}
               </span>
             </div>
             <ChevronDown className="h-3.5 w-3.5 text-text-muted hidden sm:block" />
@@ -266,15 +274,11 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
             >
               <div className="p-2 border-b border-border">
                 <p className="text-label-md font-semibold text-text-primary">
-                  Elena Vance
+                  {currentUser?.full_name ?? "User"}
                 </p>
                 <p className="text-[11px] font-mono text-text-muted truncate">
-                  elena@acme-cloud.io
+                  {currentUser?.email ?? ""}
                 </p>
-                <div className="mt-1 flex items-center gap-1 text-[10px] text-success">
-                  <ShieldCheck className="h-3 w-3" />
-                  <span>Owner</span>
-                </div>
               </div>
 
               <div className="py-1">

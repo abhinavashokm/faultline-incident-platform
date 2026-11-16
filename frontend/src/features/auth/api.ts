@@ -1,6 +1,7 @@
 import { ApiError, apiClient, setAccessToken, refreshAccessToken } from "@/lib/api-client";
 import {
   AuthResponse,
+  CurrentUserResponse,
   ResendVerificationResponse,
   UserResponse,
 } from "./types";
@@ -52,6 +53,18 @@ export async function resendOtpApi(
     "/api/v1/auth/resend-verification",
     { email }
   );
+}
+
+export async function fetchCurrentUserApi(): Promise<CurrentUserResponse> {
+  return await apiClient.get<CurrentUserResponse>("/api/v1/auth/me");
+}
+
+export async function logoutApi(): Promise<void> {
+  try {
+    await apiClient.post("/api/v1/auth/logout");
+  } catch (error) {
+    // Ignore server error on logout so client always logs out cleanly
+  }
 }
 
 /**

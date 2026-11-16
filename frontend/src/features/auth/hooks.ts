@@ -1,6 +1,7 @@
-import { useMutation } from "@tanstack/react-query";
-import { loginApi, signupApi, verifyOtpApi, resendOtpApi } from "./api";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { loginApi, signupApi, verifyOtpApi, resendOtpApi, fetchCurrentUserApi } from "./api";
 import { LoginFormData, SignupFormData, VerifyOtpFormData } from "./schemas";
+import { useAuth } from "./auth-context";
 
 export function useLogin() {
   return useMutation({
@@ -25,4 +26,16 @@ export function useResendOtp() {
     mutationFn: (email: string) => resendOtpApi(email),
   });
 }
+
+export function useCurrentUser() {
+  const { isReady, isAuthenticated } = useAuth();
+
+  return useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: fetchCurrentUserApi,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: isReady && isAuthenticated,
+  });
+}
+
 

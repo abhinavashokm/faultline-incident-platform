@@ -14,6 +14,7 @@ import {
   refreshAccessToken,
   setRefreshFailureHandler,
 } from "@/lib/api-client";
+import { logoutApi } from "./api";
 
 // ---------------------------------------------------------------------------
 // Context shape
@@ -55,10 +56,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Avoid double-bootstrapping in React Strict Mode.
   const bootstrapped = useRef(false);
 
-  const logout = useCallback(() => {
-    clearAccessToken();
-    setIsAuthenticated(false);
-    router.push("/login");
+  const logout = useCallback(async () => {
+    try {
+      await logoutApi();
+    } finally {
+      clearAccessToken();
+      setIsAuthenticated(false);
+      router.push("/login");
+    }
   }, [router]);
 
   // Register the failure handler on the api-client so the 401 interceptor can
