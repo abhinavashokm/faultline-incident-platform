@@ -1,6 +1,6 @@
 """Constants used across the Faultline SDK."""
 
-EVENTS_ENDPOINT = "/api/v1/events"
+EVENTS_ENDPOINT = "/api/v1/ingest/errors"
 PERFORMANCE_ENDPOINT = "/api/v1/ingest/performance"
 
 # Histogram versioning (immutable upper bounds in milliseconds)
