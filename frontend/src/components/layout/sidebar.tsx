@@ -42,8 +42,9 @@ export function Sidebar({
   const params = useParams();
   const { data: projects } = useListProjects();
 
+  const routeProjectSlug = params?.projectSlug as string | undefined;
   const currentProjectSlug =
-    (params?.projectSlug as string) || (projects && projects[0]?.slug) || "";
+    routeProjectSlug || (projects && projects[0]?.slug) || "";
 
   const basePrefix = currentProjectSlug
     ? `/${workspaceSlug}/${currentProjectSlug}`
@@ -145,7 +146,8 @@ export function Sidebar({
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
-              pathname === item.href ||
+              (Boolean(routeProjectSlug) &&
+                (pathname === item.href || pathname.startsWith(`${item.href}/`))) ||
               (item.href.endsWith("/overview") && pathname === `/${workspaceSlug}`);
 
             return (
