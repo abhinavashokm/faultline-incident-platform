@@ -25,17 +25,30 @@ def setup_logging() -> None:
     )
 
 
+def _register_shutdown_handlers(stop_event: asyncio.Event) -> None:
+    """Set `stop_event` when SIGINT or SIGTERM is received.
+
+    Enables graceful shutdown so in-flight work can finish and resources
+    (e.g. the DB engine) are cleaned up before exit. Silently skips
+    registration where unsupported (e.g. Windows or a non-main thread),
+    since the worker can still run without it.
+
+    Must be called from within a running event loop.
+    """
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, stop_event.set)
+        except (NotImplementedError, RuntimeError):
+            pass
+
+
 async def run_alerts_worker(stop_event: asyncio.Event | None = None) -> None:
     """Run alert evaluation consumer for issue-events."""
     if stop_event is None:
         stop_event = asyncio.Event()
 
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            loop.add_signal_handler(sig, lambda: stop_event.set())
-        except (NotImplementedError, RuntimeError):
-            pass
+    _register_shutdown_handlers(stop_event)
 
     evaluation_service = AlertEvaluationService(SessionLocal)
     handler = build_alerts_consumer_handler(evaluation_service)
@@ -59,12 +72,7 @@ async def run_delivery_worker(stop_event: asyncio.Event | None = None) -> None:
     if stop_event is None:
         stop_event = asyncio.Event()
 
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            loop.add_signal_handler(sig, lambda: stop_event.set())
-        except (NotImplementedError, RuntimeError):
-            pass
+    _register_shutdown_handlers(stop_event)
 
     delivery_service = OutboxDeliveryService(SessionLocal)
     logger.info("Starting delivery worker outbox loop...")
