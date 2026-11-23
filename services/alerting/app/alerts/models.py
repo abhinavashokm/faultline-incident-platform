@@ -20,11 +20,15 @@ class AlertRule(Base):
     """Configuration rule for triggering alerts."""
 
     __tablename__ = "alert_rules"
-    __table_args__ = {"schema": SCHEMA}
+    __table_args__ = (
+        Index("ix_alerting_alert_rules_workspace_project", "workspace_id", "project_id"),
+        {"schema": SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     rule_type: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -64,6 +68,7 @@ class AlertState(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     rule_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -88,7 +93,10 @@ class Alert(Base):
 
     __tablename__ = "alerts"
     __table_args__ = (
-        Index("ix_alerts_project_status_last_triggered", "project_id", "status", "last_triggered_at"),
+        Index(
+            "ix_alerting_alerts_workspace_project_status_last_triggered",
+            "workspace_id", "project_id", "status", "last_triggered_at",
+        ),
         Index("ix_alerts_state_id", "state_id"),
         {"schema": SCHEMA},
     )
@@ -96,6 +104,7 @@ class Alert(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     rule_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

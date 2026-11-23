@@ -3,6 +3,7 @@ import {
   NotificationChannel,
   CreateNotificationChannelPayload,
   AlertRule,
+  AlertRuleListResponse,
   CreateAlertRulePayload,
 } from "../types";
 
@@ -73,10 +74,12 @@ export async function createWebhookChannelMock(payload: CreateWebhookChannelMock
  * List alert rules for a project.
  */
 export async function listAlertRules(
-  projectId: string
-): Promise<AlertRule[]> {
-  return apiClient.get<AlertRule[]>(
-    `/api/v1/projects/${projectId}/alert-rules`
+  projectId: string,
+  cursor?: string
+): Promise<AlertRuleListResponse> {
+  const query = cursor ? `?${new URLSearchParams({ cursor })}` : "";
+  return apiClient.get<AlertRuleListResponse>(
+    `/api/v1/projects/${projectId}/alert-rules${query}`
   );
 }
 

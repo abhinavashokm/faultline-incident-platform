@@ -7,7 +7,10 @@ from httpx import AsyncClient
 async def test_list_alert_rules_empty(client: AsyncClient, test_project_id: uuid.UUID):
     response = await client.get(f"/api/v1/projects/{test_project_id}/alert-rules")
     assert response.status_code == 200
-    assert response.json() == []
+    assert response.json() == {
+        "items": [],
+        "meta": {"limit": 25, "has_more": False, "next_cursor": None},
+    }
 
 
 @pytest.mark.asyncio
@@ -56,7 +59,7 @@ async def test_create_and_list_alert_rule(client: AsyncClient, test_project_id: 
     # List alert rules
     list_res = await client.get(f"/api/v1/projects/{test_project_id}/alert-rules")
     assert list_res.status_code == 200
-    rules = list_res.json()
+    rules = list_res.json()["items"]
     assert len(rules) >= 1
     assert any(r["id"] == rule_id for r in rules)
 
@@ -77,5 +80,32 @@ async def test_create_and_list_alert_rule(client: AsyncClient, test_project_id: 
     # Verify deleted
     list_after_res = await client.get(f"/api/v1/projects/{test_project_id}/alert-rules")
     assert list_after_res.status_code == 200
-    assert not any(r["id"] == rule_id for r in list_after_res.json())
+    assert not any(r["id"] == rule_id for r in list_after_res.json()["items"])
 
+
+@pytest.mark.asyncio
+async def test_list_alert_rules_cursor(client: AsyncClient, test_project_id: uuid.UUID) -> None:
+    path = f"/api/v1/projects/{test_project_id}/alert-rules"
+    ids = []
+    for name in ("First", "Second"):
+        created = await client.post(path, json={"name": name, "rule_type": "new_issue"})
+        assert created.status_code == 201
+        ids.append(created.json()["id"])
+
+    response = await client.get(path, params={"limit": 1})
+    assert response.status_code == 200
+    first = response.json()
+    assert [rule["id"] for rule in first["items"]] == ids[1:]
+    assert first["meta"]["has_more"] is True
+    assert first["meta"]["next_cursor"]
+
+    response = await client.get(path, params={"limit": 1, "cursor": first["meta"]["next_cursor"]})
+    assert response.status_code == 200
+    second = response.json()
+    assert [rule["id"] for rule in second["items"]] == ids[:1]
+    assert second["meta"] == {"limit": 1, "has_more": False, "next_cursor": None}
+
+    invalid = await client.get(path, params={"cursor": "invalid"})
+    assert invalid.status_code == 422
+    assert invalid.json() == {"detail": "Invalid cursor"}
+    assert (await client.get(path, params={"limit": 101})).status_code == 422

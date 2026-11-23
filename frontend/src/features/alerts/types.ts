@@ -68,3 +68,12 @@ export const createAlertRuleSchema = z.object({
 });
 
 export type CreateAlertRuleFormData = z.infer<typeof createAlertRuleSchema>;
+
+export interface AlertRuleListResponse {
+  items: AlertRule[];
+  meta: {
+    limit: number;
+    has_more: boolean;
+    next_cursor: string | null;
+  };
+}

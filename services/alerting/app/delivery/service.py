@@ -92,28 +92,30 @@ class NotificationChannelService:
         self.session = session
         self.repository = NotificationChannelRepository(session)
 
-    async def list_channels(self, project_id: uuid.UUID) -> Sequence[NotificationChannel]:
-        """List all notification channels for a project.
-
-        # TODO: verify project belongs to the JWT workspace (Control Plane lookup)
-        """
-        return await self.repository.list_by_project(project_id)
+    async def list_channels(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> Sequence[NotificationChannel]:
+        """List all notification channels for a project."""
+        # Known gap: project ownership is not verified against the Control Plane;
+        # data is isolated by workspace_id only.
+        return await self.repository.list_by_project(workspace_id, project_id)
 
     async def create_channel(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         channel_in: NotificationChannelCreate,
         creator_id: uuid.UUID | None = None,
         background_tasks: BackgroundTasks | None = None,
         email_sender: EmailSender | None = None,
     ) -> NotificationChannel:
-        """Create a new notification channel for a project.
-
-        # TODO: verify project belongs to the JWT workspace (Control Plane lookup)
-        """
+        """Create a new notification channel for a project."""
+        # Known gap: project ownership is not verified against the Control Plane;
+        # data is isolated by workspace_id only.
         channel_id = uuid7()
         channel = NotificationChannel(
             id=channel_id,
+            workspace_id=workspace_id,
             project_id=project_id,
             name=channel_in.name,
             channel_type=channel_in.channel_type,

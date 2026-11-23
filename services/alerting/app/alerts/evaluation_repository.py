@@ -7,12 +7,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from app.alerts.matcher import get_matcher
-from app.alerts.models import Alert, AlertRule, AlertState, ProcessedEvent
-from app.alerts.repository import AlertRuleRepository
-from app.delivery.models import AlertRuleChannel, Delivery, NotificationChannel
+from app.alerts.models import Alert, AlertState, ProcessedEvent
+from app.delivery.models import Delivery, NotificationChannel
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +46,15 @@ class AlertEvaluationRepository:
     async def get_or_create_alert_state(
         self,
         rule_id: UUID,
+        workspace_id: UUID,
         project_id: UUID,
         deduplication_key: str,
         now: datetime,
     ) -> AlertState:
         """Fetch or create AlertState for (rule_id, deduplication_key)."""
         query = select(AlertState).where(
+            AlertState.workspace_id == workspace_id,
+            AlertState.project_id == project_id,
             AlertState.rule_id == rule_id,
             AlertState.deduplication_key == deduplication_key,
         )
@@ -64,6 +64,7 @@ class AlertEvaluationRepository:
         if state is None:
             state = AlertState(
                 id=uuid.uuid4(),
+                workspace_id=workspace_id,
                 project_id=project_id,
                 rule_id=rule_id,
                 deduplication_key=deduplication_key,
@@ -86,6 +87,7 @@ class AlertEvaluationRepository:
         self,
         rule_id: UUID,
         state_id: UUID,
+        workspace_id: UUID,
         project_id: UUID,
         title: str,
         severity: str,
@@ -95,6 +97,7 @@ class AlertEvaluationRepository:
         """Create and flush an Alert row."""
         alert = Alert(
             id=uuid.uuid4(),
+            workspace_id=workspace_id,
             project_id=project_id,
             rule_id=rule_id,
             state_id=state_id,
@@ -119,12 +122,17 @@ class AlertEvaluationRepository:
         """Create outbox Delivery rows for each configured channel."""
         deliveries: list[Delivery] = []
         for channel in channels:
-            if not channel.enabled:
+            if (
+                not channel.enabled
+                or channel.workspace_id != alert.workspace_id
+                or channel.project_id != alert.project_id
+            ):
                 continue
             # Idempotency key per alert and channel
             idempotency_key = f"{alert.id}:{channel.id}"
             delivery = Delivery(
                 id=uuid.uuid4(),
+                workspace_id=channel.workspace_id,
                 project_id=alert.project_id,
                 alert_id=alert.id,
                 channel_id=channel.id,

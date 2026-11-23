@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timezone
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -44,8 +43,9 @@ class AlertEvaluationService:
                     return False
 
                 # 2. Fetch enabled rules for the project
-                rules = await rule_repo.list_enabled_by_project(event.project_id)
-                now = datetime.now(timezone.utc)
+                rules = await rule_repo.list_enabled_by_project(event.workspace_id, event.project_id)
+                # Alert and state timestamps are stored as UTC without a timezone.
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
                 payload = event.payload
 
                 for rule in rules:
@@ -66,6 +66,7 @@ class AlertEvaluationService:
                     # 3. Alert state
                     state = await eval_repo.get_or_create_alert_state(
                         rule_id=rule.id,
+                        workspace_id=rule.workspace_id,
                         project_id=rule.project_id,
                         deduplication_key=dedup_key,
                         now=now,
@@ -76,6 +77,7 @@ class AlertEvaluationService:
                     alert = await eval_repo.create_alert(
                         rule_id=rule.id,
                         state_id=state.id,
+                        workspace_id=rule.workspace_id,
                         project_id=rule.project_id,
                         title=alert_title,
                         severity=rule.severity,

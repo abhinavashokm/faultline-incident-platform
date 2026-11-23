@@ -15,11 +15,16 @@ class NotificationChannelRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_by_project(self, project_id: uuid.UUID) -> Sequence[NotificationChannel]:
+    async def list_by_project(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> Sequence[NotificationChannel]:
         """Fetch all notification channels for a project ordered by creation date descending."""
         query = (
             select(NotificationChannel)
-            .where(NotificationChannel.project_id == project_id)
+            .where(
+                NotificationChannel.workspace_id == workspace_id,
+                NotificationChannel.project_id == project_id,
+            )
             .order_by(NotificationChannel.created_at.desc(), NotificationChannel.id.desc())
         )
         result = await self.session.execute(query)

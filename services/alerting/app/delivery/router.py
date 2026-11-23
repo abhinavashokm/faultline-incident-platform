@@ -31,7 +31,7 @@ async def list_notification_channels(
 ) -> list[NotificationChannelResponse]:
     """List notification channels for a project ordered by created_at desc."""
     service = NotificationChannelService(session)
-    channels = await service.list_channels(project_id)
+    channels = await service.list_channels(principal.workspace_id, project_id)
     return [NotificationChannelResponse.model_validate(c) for c in channels]
 
 
@@ -52,6 +52,7 @@ async def create_notification_channel(
     """Create a new notification channel for a project."""
     service = NotificationChannelService(session)
     channel = await service.create_channel(
+        workspace_id=principal.workspace_id,
         project_id=project_id,
         channel_in=channel_in,
         creator_id=principal.user_id,
