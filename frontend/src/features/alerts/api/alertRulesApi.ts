@@ -30,6 +30,45 @@ export async function createChannel(
   );
 }
 
+export type CreateWebhookChannelMockPayload = {
+  name: string;
+  channel_type: "webhook";
+  destination: string;
+  enabled: boolean;
+  auth:
+    | null
+    | { type: "bearer"; value: string }
+    | { type: "header"; name: string; value: string };
+};
+
+export type MockWebhookChannel = Omit<CreateWebhookChannelMockPayload, "auth"> & {
+  id: string;
+  has_auth: boolean;
+};
+
+// TODO: Replace this mock with the real create call when webhook channels are supported.
+export async function createWebhookChannelMock(payload: CreateWebhookChannelMockPayload) {
+  const { auth, ...channel } = payload;
+  const request = {
+    ...channel,
+    auth: auth && { ...auth, value: "[redacted]" },
+  };
+  console.log("Mock webhook channel request", request);
+
+  await new Promise<void>((resolve) => setTimeout(resolve, 600));
+
+  const response: MockWebhookChannel & { signing_secret: string } = {
+    ...channel,
+    id: crypto.randomUUID(),
+    has_auth: auth !== null,
+    signing_secret: "whsec_" + Array.from(
+      crypto.getRandomValues(new Uint8Array(16)),
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join(""),
+  };
+  return { request, response };
+}
+
 /**
  * List alert rules for a project.
  */

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Radio,
   Plus,
@@ -26,9 +26,19 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { useProjectBySlug } from "@/features/projects/hooks";
-import { listChannels, createChannel } from "@/features/alerts/api/alertRulesApi";
-import { NotificationChannel } from "@/features/alerts/types";
+import {
+  listChannels,
+  createChannel,
+  createWebhookChannelMock,
+  type CreateWebhookChannelMockPayload,
+  type MockWebhookChannel,
+} from "@/features/alerts/api/alertRulesApi";
+import { WebhookChannelForm } from "@/features/alerts/components/webhook-channel-form";
+import { WebhookSigningSecretDialog } from "@/features/alerts/components/webhook-signing-secret-dialog";
 import { ApiError } from "@/lib/api-client";
+
+const webhookFormId = "create-webhook-channel";
+type WebhookMockRequest = Awaited<ReturnType<typeof createWebhookChannelMock>>["request"];
 
 export default function NotificationChannelsPage() {
   const params = useParams();
@@ -42,15 +52,22 @@ export default function NotificationChannelsPage() {
   const projectId = project?.id;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [channelType, setChannelType] = useState<"email" | "slack" | "webhook">("email");
+  const [channelType, setChannelType] = useState<"email" | "webhook">("email");
   const [channelName, setChannelName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [recipients, setRecipients] = useState<string[]>([]);
   const [formValidationError, setFormValidationError] = useState<string | null>(null);
+  const [isWebhookSubmitting, setIsWebhookSubmitting] = useState(false);
+  const webhookInFlight = useRef(false);
+  const [webhookConfirmation, setWebhookConfirmation] = useState<{
+    projectId: string;
+    request: WebhookMockRequest;
+    secret: string;
+  } | null>(null);
 
   // Fetch channels list query
   const {
-    data: channels = [],
+    data: serverChannels = [],
     isLoading: isChannelsLoading,
     isError: isChannelsError,
     error: channelsError,
@@ -60,6 +77,13 @@ export default function NotificationChannelsPage() {
     queryFn: () => listChannels(projectId!),
     enabled: Boolean(projectId),
   });
+
+  const mockChannelsKey = ["mock-webhook-channels", workspaceSlug, projectId];
+  const { data: mockChannels = [] } = useQuery<MockWebhookChannel[]>({
+    queryKey: mockChannelsKey,
+    queryFn: skipToken,
+  });
+  const channels = [...serverChannels, ...mockChannels];
 
   // Create channel mutation
   const createChannelMutation = useMutation({
@@ -114,13 +138,44 @@ export default function NotificationChannelsPage() {
     setRecipients(recipients.filter((email) => email !== emailToRemove));
   };
 
+  const resetEmailFields = () => {
+    setRecipientEmail("");
+    setRecipients([]);
+    setFormValidationError(null);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setChannelName("");
-    setRecipientEmail("");
-    setRecipients([]);
     setChannelType("email");
-    setFormValidationError(null);
+    resetEmailFields();
+  };
+
+  const handleSelectChannelType = (type: "email" | "webhook") => {
+    if (type === channelType) return;
+    resetEmailFields();
+    setChannelType(type);
+  };
+
+  const handleSaveWebhook = async (payload: CreateWebhookChannelMockPayload) => {
+    if (!projectId || webhookInFlight.current) return;
+    webhookInFlight.current = true;
+    setIsWebhookSubmitting(true);
+    try {
+      const { request, response: { signing_secret, ...channel } } = await createWebhookChannelMock(payload);
+      queryClient.setQueryData<MockWebhookChannel[]>(mockChannelsKey, (current = []) => [...current, channel]);
+      handleCloseModal();
+      setWebhookConfirmation({ projectId, request, secret: signing_secret });
+    } catch (err) {
+      toast({
+        title: "Channel creation failed",
+        description: err instanceof Error ? err.message : "Failed to create channel",
+        variant: "destructive",
+      });
+    } finally {
+      webhookInFlight.current = false;
+      setIsWebhookSubmitting(false);
+    }
   };
 
   const handleSaveChannel = async () => {
@@ -151,6 +206,7 @@ export default function NotificationChannelsPage() {
   };
 
   const isLoading = isProjectLoading || isChannelsLoading;
+  const isSubmitting = createChannelMutation.isPending || isWebhookSubmitting;
   const activeCount = channels.filter((c) => c.enabled).length;
 
   return (
@@ -172,7 +228,7 @@ export default function NotificationChannelsPage() {
             Notification Channels
           </h1>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            Configure email destinations for alert dispatch in {projectSlug || "your project"}. Managed relay routes guarantee deliverability during incident cascades.
+            Configure email and webhook destinations for alert dispatch in {projectSlug || "your project"}.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
@@ -248,7 +304,7 @@ export default function NotificationChannelsPage() {
             <Skeleton className="h-12 w-full rounded-lg" />
           </div>
         </div>
-      ) : isChannelsError ? (
+      ) : isChannelsError && channels.length === 0 ? (
         <div className="flex min-h-[340px] flex-col items-center justify-center rounded-xl border border-dashed border-error/40 p-8 text-center bg-error-container/10">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-error/10 text-error mb-4">
             <AlertTriangle className="h-7 w-7" />
@@ -298,65 +354,74 @@ export default function NotificationChannelsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border text-sm">
-                {channels.map((channel) => (
-                  <tr key={channel.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="py-4 px-4 font-medium text-foreground">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                          <Mail className="h-4 w-4" />
+                {channels.map((channel) => {
+                  const isWebhook = channel.channel_type === "webhook";
+                  const createdAt = isWebhook ? undefined : channel.createdAt || channel.created_at;
+                  return (
+                    <tr key={channel.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="py-4 px-4 font-medium text-foreground">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            {isWebhook ? <Webhook className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-foreground">{channel.name}</div>
+                            <div className="text-xs text-muted-foreground font-mono">{channel.id.slice(0, 8)}...</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-semibold text-foreground">{channel.name}</div>
-                          <div className="text-xs text-muted-foreground font-mono">{channel.id.slice(0, 8)}...</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-muted text-xs font-mono uppercase text-foreground">
-                        {channel.channelType || channel.channel_type || "email"}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="font-mono text-xs text-foreground bg-surface-container px-2 py-1 rounded">
-                        {channel.destination}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                          channel.enabled
-                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            channel.enabled ? "bg-emerald-500" : "bg-muted-foreground"
-                          }`}
-                        />
-                        {channel.enabled ? "Active" : "Disabled"}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 whitespace-nowrap text-xs text-muted-foreground">
-                      {channel.createdAt || channel.created_at ? (
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
-                          <span>
-                            {new Date(
-                              (channel.createdAt || channel.created_at)!
-                            ).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-muted text-xs font-mono uppercase text-foreground">
+                          {isWebhook ? "webhook" : channel.channelType || channel.channel_type || "email"}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs text-foreground bg-surface-container px-2 py-1 rounded">
+                            {isWebhook ? new URL(channel.destination).host : channel.destination}
                           </span>
+                          {isWebhook && channel.has_auth && (
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                              Auth: configured
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        "--"
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                            channel.enabled
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              channel.enabled ? "bg-emerald-500" : "bg-muted-foreground"
+                            }`}
+                          />
+                          {channel.enabled ? "Active" : "Disabled"}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap text-xs text-muted-foreground">
+                        {createdAt ? (
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
+                            <span>
+                              {new Date(createdAt).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          "--"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -366,15 +431,20 @@ export default function NotificationChannelsPage() {
       {/* Add Notification Channel Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in-50">
-          <div className="w-full max-w-2xl rounded-2xl bg-card border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-channel-title"
+            className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-2xl bg-card border border-border shadow-2xl overflow-hidden animate-in zoom-in-95"
+          >
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-card">
+            <div className="shrink-0 px-6 py-5 border-b border-border flex items-center justify-between bg-card">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <Radio className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-foreground">
+                  <h3 id="add-channel-title" className="text-lg font-semibold text-foreground">
                     Add Notification Channel
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -385,6 +455,7 @@ export default function NotificationChannelsPage() {
               <button
                 type="button"
                 onClick={handleCloseModal}
+                disabled={isWebhookSubmitting}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 aria-label="Close modal"
               >
@@ -393,7 +464,7 @@ export default function NotificationChannelsPage() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+            <div className="min-h-0 p-6 space-y-6 max-h-[75vh] overflow-y-auto">
               {formValidationError && (
                 <div className="flex items-center gap-2.5 rounded-lg border border-error/30 bg-error-container p-3.5 text-error text-body-sm font-medium">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -410,7 +481,9 @@ export default function NotificationChannelsPage() {
                   {/* Email Option - Default & Active */}
                   <button
                     type="button"
-                    onClick={() => setChannelType("email")}
+                    onClick={() => handleSelectChannelType("email")}
+                    aria-pressed={channelType === "email"}
+                    disabled={isSubmitting}
                     className={`p-3.5 rounded-xl text-left border transition-all flex flex-col gap-2 ${
                       channelType === "email"
                         ? "border-primary bg-primary/5 shadow-sm"
@@ -419,7 +492,7 @@ export default function NotificationChannelsPage() {
                   >
                     <div className="flex items-center justify-between w-full">
                       <Mail className="h-5 w-5 text-primary" />
-                      <span className="w-2 h-2 rounded-full bg-primary" />
+                      {channelType === "email" && <span className="w-2 h-2 rounded-full bg-primary" />}
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-foreground">Email</div>
@@ -446,21 +519,24 @@ export default function NotificationChannelsPage() {
                     </div>
                   </button>
 
-                  {/* Webhook Option - Disabled */}
+                  {/* Webhook Option */}
                   <button
                     type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="p-3.5 rounded-xl text-left border border-border bg-muted/40 opacity-60 cursor-not-allowed flex flex-col gap-2"
+                    onClick={() => handleSelectChannelType("webhook")}
+                    aria-pressed={channelType === "webhook"}
+                    disabled={isSubmitting}
+                    className={`p-3.5 rounded-xl text-left border transition-all flex flex-col gap-2 ${
+                      channelType === "webhook"
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border bg-card hover:bg-muted/50"
+                    }`}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <Webhook className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                        Soon
-                      </span>
+                      <Webhook className="h-5 w-5 text-primary" />
+                      {channelType === "webhook" && <span className="w-2 h-2 rounded-full bg-primary" />}
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-muted-foreground">Webhook</div>
+                      <div className="text-sm font-semibold text-foreground">Webhook</div>
                       <div className="text-xs text-muted-foreground">Signed HTTP POST</div>
                     </div>
                   </button>
@@ -523,25 +599,34 @@ export default function NotificationChannelsPage() {
                   </div>
                 </div>
               )}
+              {channelType === "webhook" && (
+                <WebhookChannelForm
+                  formId={webhookFormId}
+                  channelName={channelName}
+                  onChannelNameChange={setChannelName}
+                  onSave={handleSaveWebhook}
+                />
+              )}
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-muted/30 border-t border-border flex items-center justify-end gap-3">
+            <div className="shrink-0 px-6 py-4 bg-muted/30 border-t border-border flex items-center justify-end gap-3">
               <Button
                 variant="outline"
                 type="button"
-                disabled={createChannelMutation.isPending}
+                disabled={isSubmitting}
                 onClick={handleCloseModal}
               >
                 Cancel
               </Button>
               <Button
-                type="button"
-                disabled={createChannelMutation.isPending}
-                onClick={handleSaveChannel}
+                type={channelType === "webhook" ? "submit" : "button"}
+                form={channelType === "webhook" ? webhookFormId : undefined}
+                disabled={isSubmitting || (channelType === "webhook" && !projectId)}
+                onClick={channelType === "email" ? handleSaveChannel : undefined}
                 className="gap-2"
               >
-                {createChannelMutation.isPending && (
+                {isSubmitting && (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
                 Save Channel
@@ -549,6 +634,13 @@ export default function NotificationChannelsPage() {
             </div>
           </div>
         </div>
+      )}
+      {webhookConfirmation && webhookConfirmation.projectId === projectId && (
+        <WebhookSigningSecretDialog
+          secret={webhookConfirmation.secret}
+          request={webhookConfirmation.request}
+          onClose={() => setWebhookConfirmation(null)}
+        />
       )}
     </div>
   );
