@@ -30,6 +30,17 @@ class NotificationChannelRepository:
         result = await self.session.execute(query)
         return result.scalars().all()
 
+    async def get_by_project(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID, channel_id: uuid.UUID
+    ) -> NotificationChannel | None:
+        return await self.session.scalar(
+            select(NotificationChannel).where(
+                NotificationChannel.workspace_id == workspace_id,
+                NotificationChannel.project_id == project_id,
+                NotificationChannel.id == channel_id,
+            )
+        )
+
     async def create(self, channel: NotificationChannel) -> NotificationChannel:
         """Add and flush a new notification channel."""
         self.session.add(channel)

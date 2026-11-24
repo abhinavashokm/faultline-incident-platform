@@ -156,6 +156,10 @@ async function handleResponse<T>(
     const message = extractErrorMessage(errorData, response.statusText);
     throw new ApiError(response.status, message, errorData);
   }
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   const data = await response.json();
   if (transformCase && data !== null && typeof data === "object") {
     return keysToCamel<T>(data);
@@ -292,16 +296,6 @@ export const apiClient = {
     if (response.status === 401 && !options?._retried && !isAuthEndpoint(path)) {
       await refreshAccessToken();
       return apiClient.delete<T>(path, { ...options, _retried: true });
-    }
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const message = extractErrorMessage(errorData, response.statusText);
-      throw new ApiError(response.status, message, errorData);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
     }
 
     return handleResponse<T>(response, options?.transformCase ?? true);

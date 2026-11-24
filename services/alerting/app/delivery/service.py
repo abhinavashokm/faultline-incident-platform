@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.uuid7 import uuid7
-from app.delivery.email import EmailSender, mask_email, strip_crlf
+from app.delivery.email import EmailDeliveryError, EmailSender, mask_email, strip_crlf
 from app.delivery.models import NotificationChannel
 from app.delivery.repository import NotificationChannelRepository
 from app.delivery.schemas import (
@@ -22,6 +22,7 @@ from app.delivery.schemas import (
     WebhookChannelCreate,
     WebhookChannelCreated,
 )
+from app.delivery.webhook import WebhookChannelSender, WebhookDeliveryError
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +170,46 @@ class NotificationChannelService:
 
         return created_channel
 
+
+    async def test_channel(
+        self,
+        workspace_id: uuid.UUID,
+        project_id: uuid.UUID,
+        channel_id: uuid.UUID,
+        email_sender: EmailSender,
+    ) -> None:
+        channel = await self.repository.get_by_project(workspace_id, project_id, channel_id)
+        if channel is None:
+            raise HTTPException(status_code=404, detail="Notification channel not found")
+        if channel.channel_type not in {"email", "webhook"}:
+            raise HTTPException(status_code=409, detail="Channel type does not support test delivery")
+
+        # Release the read transaction before waiting for delivery.
+        await self.session.commit()
+        message = "This is a test notification from Faultline."
+        try:
+            if channel.channel_type == "webhook":
+                await WebhookChannelSender().send_payload(
+                    channel,
+                    {
+                        "event_type": "notification.test",
+                        "project_id": str(project_id),
+                        "channel_id": str(channel_id),
+                        "message": message,
+                    },
+                    str(uuid7()),
+                )
+            else:
+                await email_sender.send(
+                    to_email=channel.destination,
+                    subject="[Faultline] Test notification",
+                    text_body=message,
+                    html_body=f"<p>{message}</p>",
+                )
+        except WebhookDeliveryError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from None
+        except EmailDeliveryError:
+            raise HTTPException(status_code=502, detail="Could not send test email") from None
 
     async def create_webhook_channel(
         self,

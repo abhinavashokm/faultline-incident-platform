@@ -74,6 +74,29 @@ async def create_notification_channel(
     return NotificationChannelResponse.model_validate(channel)
 
 
+@router.post(
+    "/projects/{project_id}/notification-channels/{channel_id}/test",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Send a test notification",
+    responses={
+        404: {"description": "Channel not found"},
+        409: {"description": "Channel type does not support test delivery"},
+        502: {"description": "Test delivery failed"},
+    },
+)
+async def test_notification_channel(
+    project_id: UUID,
+    channel_id: UUID,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+    email_sender: EmailSender = Depends(get_email_sender),
+) -> Response:
+    await NotificationChannelService(session).test_channel(
+        principal.workspace_id, project_id, channel_id, email_sender
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.delete(
     "/projects/{project_id}/notification-channels/{channel_id}",
     status_code=status.HTTP_204_NO_CONTENT,

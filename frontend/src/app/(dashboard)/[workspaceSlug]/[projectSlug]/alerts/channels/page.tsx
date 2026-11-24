@@ -28,6 +28,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useProjectBySlug } from "@/features/projects/hooks";
 import {
   listChannels,
+  testChannel,
   createChannel,
   createWebhookChannel,
   type CreateWebhookChannelPayload,
@@ -73,6 +74,18 @@ export default function NotificationChannelsPage() {
     queryKey: ["notification-channels", projectId],
     queryFn: () => listChannels(projectId!),
     enabled: Boolean(projectId),
+  });
+
+  const testChannelMutation = useMutation({
+    mutationFn: ({ projectId, channelId }: { projectId: string; channelId: string }) =>
+      testChannel(projectId, channelId),
+    onSuccess: () => toast({ title: "Test notification sent", variant: "success" }),
+    onError: (err: unknown) =>
+      toast({
+        title: "Test delivery failed",
+        description: err instanceof Error ? err.message : "Could not send the test notification",
+        variant: "destructive",
+      }),
   });
 
   // Create channel mutation
@@ -341,6 +354,7 @@ export default function NotificationChannelsPage() {
                   <th className="py-3.5 px-4">Destination</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4">Created</th>
+                  <th className="py-3.5 px-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border text-sm">
@@ -403,6 +417,23 @@ export default function NotificationChannelsPage() {
                         ) : (
                           "--"
                         )}
+                      </td>
+                      <td className="py-4 px-4">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          aria-label={`Test ${channel.name}`}
+                          disabled={!projectId || testChannelMutation.isPending}
+                          onClick={() => {
+                            if (projectId) testChannelMutation.mutate({ projectId, channelId: channel.id });
+                          }}
+                        >
+                          {testChannelMutation.isPending &&
+                          testChannelMutation.variables.channelId === channel.id
+                            ? "Sending…"
+                            : "Test"}
+                        </Button>
                       </td>
                     </tr>
                   );

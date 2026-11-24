@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.delivery.delivery_repository import DeliveryRepository
 from app.delivery.email import EmailSender, SMTPEmailSender, mask_email
 from app.delivery.senders import ChannelSender, EmailChannelSender
+from app.delivery.webhook import WebhookChannelSender
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class OutboxDeliveryService:
         else:
             default_email_sender = SMTPEmailSender()
             self.senders = {
+                "webhook": WebhookChannelSender(),
                 "email": EmailChannelSender(default_email_sender),
             }
 

@@ -18,6 +18,12 @@ export async function listChannels(
   );
 }
 
+export async function testChannel(projectId: string, channelId: string): Promise<void> {
+  return apiClient.post<void>(
+    `/api/v1/projects/${projectId}/notification-channels/${channelId}/test`
+  );
+}
+
 /**
  * Create a new notification channel for a project.
  */
