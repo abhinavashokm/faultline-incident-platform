@@ -38,9 +38,12 @@ def create_app() -> FastAPI:
         request: Request,
         exc: RequestValidationError,
     ) -> JSONResponse:
+        errors = exc.errors()
+        if getattr(request.scope.get("route"), "name", None) == "create_notification_channel":
+            errors = [{key: error[key] for key in ("type", "loc", "msg")} for error in errors]
         return JSONResponse(
             status_code=422,
-            content={"detail": jsonable_encoder(exc.errors())},
+            content={"detail": jsonable_encoder(errors)},
         )
 
     @app.get("/health", tags=["health"])

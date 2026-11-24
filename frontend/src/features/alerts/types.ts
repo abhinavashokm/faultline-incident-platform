@@ -7,8 +7,8 @@ export type RuleType = "new_issue";
 export interface NotificationChannel {
   id: string; // uuid
   name: string;
-  channel_type?: "email";
-  channelType?: "email";
+  channel_type?: "email" | "webhook";
+  channelType?: "email" | "webhook";
   destination: string;
   enabled: boolean;
   created_at?: string;

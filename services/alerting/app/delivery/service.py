@@ -1,17 +1,27 @@
 import html
+import json
 import logging
+import secrets
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
 
-from fastapi import BackgroundTasks
+import httpx
+from cryptography.fernet import Fernet
+from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.uuid7 import uuid7
 from app.delivery.email import EmailSender, mask_email, strip_crlf
 from app.delivery.models import NotificationChannel
 from app.delivery.repository import NotificationChannelRepository
-from app.delivery.schemas import NotificationChannelCreate
+from app.delivery.schemas import (
+    HeaderWebhookAuth,
+    NotificationChannelCreate,
+    WebhookChannelCreate,
+    WebhookChannelCreated,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,3 +168,68 @@ class NotificationChannelService:
             )
 
         return created_channel
+
+
+    async def create_webhook_channel(
+        self,
+        workspace_id: uuid.UUID,
+        project_id: uuid.UUID,
+        channel_in: WebhookChannelCreate,
+        authorization: str,
+    ) -> WebhookChannelCreated:
+        await self._verify_project_access(project_id, authorization)
+
+        key = settings.webhook_encryption_key
+        if key is None:
+            raise HTTPException(status_code=503, detail="Webhook creation is unavailable")
+        try:
+            cipher = Fernet(key.get_secret_value())
+        except ValueError:
+            logger.error("Invalid webhook encryption key configuration")
+            raise HTTPException(status_code=503, detail="Webhook creation is unavailable") from None
+
+        signing_secret = "whsec_" + secrets.token_urlsafe(32)
+        auth = channel_in.auth
+        stored_auth: dict[str, str] | None = None
+        if auth is not None:
+            stored_auth = {"type": auth.type, "value": auth.value.get_secret_value()}
+            if isinstance(auth, HeaderWebhookAuth):
+                stored_auth["name"] = auth.name
+
+        credentials = json.dumps({"signing_secret": signing_secret, "auth": stored_auth})
+        channel = await self.repository.create(NotificationChannel(
+            id=uuid7(),
+            workspace_id=workspace_id,
+            project_id=project_id,
+            name=channel_in.name,
+            channel_type=channel_in.channel_type,
+            destination=str(channel_in.destination),
+            enabled=channel_in.enabled,
+            credentials_encrypted=cipher.encrypt(credentials.encode()).decode("ascii"),
+        ))
+        response = WebhookChannelCreated(
+            id=channel.id,
+            name=channel.name,
+            channel_type="webhook",
+            destination=channel.destination,
+            enabled=channel.enabled,
+            created_at=channel.created_at,
+            signing_secret=signing_secret,
+        )
+        await self.session.commit()
+        return response
+
+    async def _verify_project_access(self, project_id: uuid.UUID, authorization: str) -> None:
+        base_url = settings.control_plane_url
+        if base_url is None:
+            raise HTTPException(status_code=503, detail="Project verification is unavailable")
+        url = f"{str(base_url).rstrip('/')}/api/v1/projects/{project_id}"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(url, headers={"Authorization": authorization})
+        except httpx.RequestError:
+            raise HTTPException(status_code=503, detail="Project verification is unavailable") from None
+        if response.status_code in (401, 403, 404):
+            raise HTTPException(status_code=404, detail="Project not found")
+        if response.status_code != 200:
+            raise HTTPException(status_code=503, detail="Project verification is unavailable")

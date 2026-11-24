@@ -1,7 +1,8 @@
 import logging
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Request, Response, status
 from faultline_auth import Principal, get_principal
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,8 @@ from app.delivery.schemas import (
     DeliveryResponse,
     NotificationChannelCreate,
     NotificationChannelResponse,
+    WebhookChannelCreate,
+    WebhookChannelCreated,
 )
 from app.delivery.service import NotificationChannelService
 
@@ -37,13 +40,17 @@ async def list_notification_channels(
 
 @router.post(
     "/projects/{project_id}/notification-channels",
-    response_model=NotificationChannelResponse,
+    response_model=WebhookChannelCreated | NotificationChannelResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create notification channel",
 )
 async def create_notification_channel(
     project_id: UUID,
-    channel_in: NotificationChannelCreate,
+    channel_in: Annotated[
+        NotificationChannelCreate | WebhookChannelCreate, Body(discriminator="channel_type")
+    ],
+    request: Request,
+    response: Response,
     background_tasks: BackgroundTasks,
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
@@ -51,6 +58,11 @@ async def create_notification_channel(
 ) -> NotificationChannelResponse:
     """Create a new notification channel for a project."""
     service = NotificationChannelService(session)
+    if isinstance(channel_in, WebhookChannelCreate):
+        response.headers["Cache-Control"] = "no-store"
+        return await service.create_webhook_channel(
+            principal.workspace_id, project_id, channel_in, request.headers.get("Authorization", ""),
+        )
     channel = await service.create_channel(
         workspace_id=principal.workspace_id,
         project_id=project_id,

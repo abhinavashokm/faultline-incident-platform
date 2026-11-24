@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { skipToken, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Radio,
   Plus,
@@ -29,16 +29,14 @@ import { useProjectBySlug } from "@/features/projects/hooks";
 import {
   listChannels,
   createChannel,
-  createWebhookChannelMock,
-  type CreateWebhookChannelMockPayload,
-  type MockWebhookChannel,
+  createWebhookChannel,
+  type CreateWebhookChannelPayload,
 } from "@/features/alerts/api/alertRulesApi";
 import { WebhookChannelForm } from "@/features/alerts/components/webhook-channel-form";
 import { WebhookSigningSecretDialog } from "@/features/alerts/components/webhook-signing-secret-dialog";
 import { ApiError } from "@/lib/api-client";
 
 const webhookFormId = "create-webhook-channel";
-type WebhookMockRequest = Awaited<ReturnType<typeof createWebhookChannelMock>>["request"];
 
 export default function NotificationChannelsPage() {
   const params = useParams();
@@ -61,13 +59,12 @@ export default function NotificationChannelsPage() {
   const webhookInFlight = useRef(false);
   const [webhookConfirmation, setWebhookConfirmation] = useState<{
     projectId: string;
-    request: WebhookMockRequest;
     secret: string;
   } | null>(null);
 
   // Fetch channels list query
   const {
-    data: serverChannels = [],
+    data: channels = [],
     isLoading: isChannelsLoading,
     isError: isChannelsError,
     error: channelsError,
@@ -77,13 +74,6 @@ export default function NotificationChannelsPage() {
     queryFn: () => listChannels(projectId!),
     enabled: Boolean(projectId),
   });
-
-  const mockChannelsKey = ["mock-webhook-channels", workspaceSlug, projectId];
-  const { data: mockChannels = [] } = useQuery<MockWebhookChannel[]>({
-    queryKey: mockChannelsKey,
-    queryFn: skipToken,
-  });
-  const channels = [...serverChannels, ...mockChannels];
 
   // Create channel mutation
   const createChannelMutation = useMutation({
@@ -157,15 +147,15 @@ export default function NotificationChannelsPage() {
     setChannelType(type);
   };
 
-  const handleSaveWebhook = async (payload: CreateWebhookChannelMockPayload) => {
+  const handleSaveWebhook = async (payload: CreateWebhookChannelPayload) => {
     if (!projectId || webhookInFlight.current) return;
     webhookInFlight.current = true;
     setIsWebhookSubmitting(true);
     try {
-      const { request, response: { signing_secret, ...channel } } = await createWebhookChannelMock(payload);
-      queryClient.setQueryData<MockWebhookChannel[]>(mockChannelsKey, (current = []) => [...current, channel]);
+      const { signingSecret } = await createWebhookChannel(projectId, payload);
       handleCloseModal();
-      setWebhookConfirmation({ projectId, request, secret: signing_secret });
+      setWebhookConfirmation({ projectId, secret: signingSecret });
+      void queryClient.invalidateQueries({ queryKey: ["notification-channels", projectId] });
     } catch (err) {
       toast({
         title: "Channel creation failed",
@@ -355,8 +345,8 @@ export default function NotificationChannelsPage() {
               </thead>
               <tbody className="divide-y divide-border text-sm">
                 {channels.map((channel) => {
-                  const isWebhook = channel.channel_type === "webhook";
-                  const createdAt = isWebhook ? undefined : channel.createdAt || channel.created_at;
+                  const isWebhook = (channel.channelType || channel.channel_type) === "webhook";
+                  const createdAt = channel.createdAt || channel.created_at;
                   return (
                     <tr key={channel.id} className="hover:bg-muted/30 transition-colors">
                       <td className="py-4 px-4 font-medium text-foreground">
@@ -380,11 +370,6 @@ export default function NotificationChannelsPage() {
                           <span className="font-mono text-xs text-foreground bg-surface-container px-2 py-1 rounded">
                             {isWebhook ? new URL(channel.destination).host : channel.destination}
                           </span>
-                          {isWebhook && channel.has_auth && (
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                              Auth: configured
-                            </span>
-                          )}
                         </div>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap">
@@ -638,7 +623,6 @@ export default function NotificationChannelsPage() {
       {webhookConfirmation && webhookConfirmation.projectId === projectId && (
         <WebhookSigningSecretDialog
           secret={webhookConfirmation.secret}
-          request={webhookConfirmation.request}
           onClose={() => setWebhookConfirmation(null)}
         />
       )}

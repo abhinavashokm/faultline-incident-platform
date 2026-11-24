@@ -15,25 +15,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CreateWebhookChannelMockPayload } from "../api/alertRulesApi";
+import type { CreateWebhookChannelPayload } from "../api/alertRulesApi";
 
-const allowHttp = process.env.NODE_ENV === "development";
-const reservedHeaders = /^(?:host$|content-length$|content-type$|authorization$|x-faultline-)/i;
+const reservedHeaders = /^(?:host$|content-length$|content-type$|authorization$|connection$|transfer-encoding$|x-faultline-)/i;
 
 const webhookSchema = z.object({
   name: z.string().trim().min(1, "Channel name is required.").max(150, "Use 150 characters or fewer."),
   url: z.string().trim().min(1, "Webhook URL is required.").url("Enter a valid URL.").pipe(
     z.string().refine((value) => {
-      const { protocol } = new URL(value);
-      return protocol === "https:" || (allowHttp && protocol === "http:");
-    }, allowHttp ? "Use an HTTPS or HTTP URL." : "Use an HTTPS URL."),
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password && !value.includes("#");
+    }, "Use an HTTPS URL without embedded credentials or a fragment."),
   ),
   enabled: z.boolean(),
   auth: z.discriminatedUnion("type", [
     z.object({ type: z.literal("none") }),
     z.object({
       type: z.literal("bearer"),
-      value: z.string().refine((value) => value.trim().length > 0, "Token is required."),
+      value: z.string().refine((value) => value.trim().length > 0 && /^[ -~]+$/.test(value), "Enter a token using printable ASCII characters."),
     }),
     z.object({
       type: z.literal("header"),
@@ -41,7 +40,7 @@ const webhookSchema = z.object({
         .min(1, "Header name is required.")
         .regex(/^[A-Za-z0-9-]+$/, "Use only letters, digits, and hyphens.")
         .refine((value) => !reservedHeaders.test(value), "This header name is reserved."),
-      value: z.string().refine((value) => value.trim().length > 0, "Header value is required."),
+      value: z.string().refine((value) => value.trim().length > 0 && /^[ -~]+$/.test(value), "Enter a header value using printable ASCII characters."),
     }),
   ]),
 });
@@ -88,7 +87,7 @@ type WebhookChannelFormProps = {
   formId: string;
   channelName: string;
   onChannelNameChange: (name: string) => void;
-  onSave: (payload: CreateWebhookChannelMockPayload) => Promise<void>;
+  onSave: (payload: CreateWebhookChannelPayload) => Promise<void>;
 };
 
 export function WebhookChannelForm({
