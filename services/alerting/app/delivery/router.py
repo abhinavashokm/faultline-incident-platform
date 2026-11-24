@@ -97,6 +97,26 @@ async def test_notification_channel(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.patch(
+    "/projects/{project_id}/notification-channels/{channel_id}",
+    response_model=NotificationChannelResponse,
+    summary="Update notification channel",
+)
+async def update_notification_channel(
+    project_id: UUID,
+    channel_id: UUID,
+    channel_in: Annotated[
+        NotificationChannelCreate | WebhookChannelCreate, Body(discriminator="channel_type")
+    ],
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+) -> NotificationChannelResponse:
+    channel = await NotificationChannelService(session).update_channel(
+        principal.workspace_id, project_id, channel_id, channel_in
+    )
+    return NotificationChannelResponse.model_validate(channel)
+
+
 @router.delete(
     "/projects/{project_id}/notification-channels/{channel_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -106,9 +126,12 @@ async def delete_notification_channel(
     project_id: UUID,
     channel_id: UUID,
     principal: Principal = Depends(get_principal),
-) -> None:
-    """Delete a notification channel."""
-    raise NotImplementedError("Channel deletion will be wired in the service implementation")
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    await NotificationChannelService(session).delete_channel(
+        principal.workspace_id, project_id, channel_id
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

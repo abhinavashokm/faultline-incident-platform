@@ -58,6 +58,25 @@ export async function createWebhookChannel(
   );
 }
 
+export type UpdateWebhookChannelPayload = Omit<CreateWebhookChannelPayload, "auth"> & {
+  auth?: CreateWebhookChannelPayload["auth"];
+};
+
+export function updateChannel(
+  projectId: string,
+  channelId: string,
+  payload: CreateNotificationChannelPayload | UpdateWebhookChannelPayload,
+): Promise<NotificationChannel> {
+  return apiClient.patch(
+    `/api/v1/projects/${projectId}/notification-channels/${channelId}`,
+    payload,
+  );
+}
+
+export function deleteChannel(projectId: string, channelId: string): Promise<void> {
+  return apiClient.delete(`/api/v1/projects/${projectId}/notification-channels/${channelId}`);
+}
+
 /**
  * List alert rules for a project.
  */

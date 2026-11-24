@@ -22,3 +22,17 @@ The `X-Faultline-Signature` header contains `sha256=<hex digest>`, computed as H
 over the exact request body using the signing secret returned at channel creation.
 `X-Faultline-Delivery-Id` identifies the outbound delivery. Test requests use
 `event_type: "notification.test"` with `project_id`, `channel_id`, and `message` fields.
+
+### Edit or delete a notification channel
+
+`PATCH /api/v1/projects/{project_id}/notification-channels/{channel_id}` accepts the
+channel's existing `channel_type`, a `name` and `destination`, and an optional
+`enabled` value. It returns the updated channel without credentials. For webhooks,
+omit `auth` to keep saved authentication, pass `null` to remove it, or supply a
+replacement. A changed webhook URL requires an explicit authentication choice.
+The signing secret is retained.
+
+`DELETE /api/v1/projects/{project_id}/notification-channels/{channel_id}` returns
+`204` and uses the existing foreign-key cascades to remove rule associations and
+deliveries, including delivery attempts. Both operations return `404` for channels
+outside the authenticated workspace or requested project.

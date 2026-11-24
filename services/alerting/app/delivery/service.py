@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 
 import httpx
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,16 @@ from app.delivery.schemas import (
 from app.delivery.webhook import WebhookChannelSender, WebhookDeliveryError
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_webhook_auth(channel_in: WebhookChannelCreate) -> dict[str, str] | None:
+    auth = channel_in.auth
+    if auth is None:
+        return None
+    stored_auth = {"type": auth.type, "value": auth.value.get_secret_value()}
+    if isinstance(auth, HeaderWebhookAuth):
+        stored_auth["name"] = auth.name
+    return stored_auth
 
 
 async def _send_channel_confirmation_email_task(
@@ -171,6 +181,56 @@ class NotificationChannelService:
         return created_channel
 
 
+    async def update_channel(
+        self,
+        workspace_id: uuid.UUID,
+        project_id: uuid.UUID,
+        channel_id: uuid.UUID,
+        channel_in: NotificationChannelCreate | WebhookChannelCreate,
+    ) -> NotificationChannel:
+        channel = await self.repository.get_by_project(
+            workspace_id, project_id, channel_id, for_update=True
+        )
+        if channel is None:
+            raise HTTPException(status_code=404, detail="Notification channel not found")
+        if channel.channel_type != channel_in.channel_type:
+            raise HTTPException(status_code=422, detail="Channel type cannot be changed")
+
+        destination = str(channel_in.destination)
+        if isinstance(channel_in, WebhookChannelCreate):
+            if "auth" in channel_in.model_fields_set:
+                key = settings.webhook_encryption_key
+                if key is None or not channel.credentials_encrypted:
+                    raise HTTPException(status_code=503, detail="Webhook credentials are unavailable")
+                try:
+                    cipher = Fernet(key.get_secret_value())
+                    credentials = json.loads(cipher.decrypt(channel.credentials_encrypted.encode()))
+                    credentials["auth"] = _serialize_webhook_auth(channel_in)
+                    channel.credentials_encrypted = cipher.encrypt(
+                        json.dumps(credentials).encode()
+                    ).decode("ascii")
+                except (ValueError, InvalidToken, TypeError):
+                    raise HTTPException(status_code=503, detail="Webhook credentials are unavailable") from None
+            elif destination != channel.destination:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Choose an authentication option when changing the webhook URL",
+                )
+
+        channel.name = channel_in.name
+        channel.destination = destination
+        if "enabled" in channel_in.model_fields_set:
+            channel.enabled = channel_in.enabled
+        await self.session.commit()
+        return channel
+
+    async def delete_channel(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID, channel_id: uuid.UUID
+    ) -> None:
+        if not await self.repository.delete_by_project(workspace_id, project_id, channel_id):
+            raise HTTPException(status_code=404, detail="Notification channel not found")
+        await self.session.commit()
+
     async def test_channel(
         self,
         workspace_id: uuid.UUID,
@@ -230,14 +290,10 @@ class NotificationChannelService:
             raise HTTPException(status_code=503, detail="Webhook creation is unavailable") from None
 
         signing_secret = "whsec_" + secrets.token_urlsafe(32)
-        auth = channel_in.auth
-        stored_auth: dict[str, str] | None = None
-        if auth is not None:
-            stored_auth = {"type": auth.type, "value": auth.value.get_secret_value()}
-            if isinstance(auth, HeaderWebhookAuth):
-                stored_auth["name"] = auth.name
-
-        credentials = json.dumps({"signing_secret": signing_secret, "auth": stored_auth})
+        credentials = json.dumps({
+            "signing_secret": signing_secret,
+            "auth": _serialize_webhook_auth(channel_in),
+        })
         channel = await self.repository.create(NotificationChannel(
             id=uuid7(),
             workspace_id=workspace_id,

@@ -21,6 +21,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,11 +32,15 @@ import {
   testChannel,
   createChannel,
   createWebhookChannel,
-  type CreateWebhookChannelPayload,
+  updateChannel,
+  deleteChannel,
+  type UpdateWebhookChannelPayload,
 } from "@/features/alerts/api/alertRulesApi";
 import { WebhookChannelForm } from "@/features/alerts/components/webhook-channel-form";
 import { WebhookSigningSecretDialog } from "@/features/alerts/components/webhook-signing-secret-dialog";
 import { ApiError } from "@/lib/api-client";
+
+import type { NotificationChannel } from "@/features/alerts/types";
 
 const webhookFormId = "create-webhook-channel";
 
@@ -50,6 +55,9 @@ export default function NotificationChannelsPage() {
   const { project, isLoading: isProjectLoading } = useProjectBySlug(projectSlug);
   const projectId = project?.id;
 
+  const [editingChannel, setEditingChannel] = useState<NotificationChannel | null>(null);
+  const [channelToDelete, setChannelToDelete] = useState<NotificationChannel | null>(null);
+  const [emailEnabled, setEmailEnabled] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [channelType, setChannelType] = useState<"email" | "webhook">("email");
   const [channelName, setChannelName] = useState("");
@@ -88,8 +96,23 @@ export default function NotificationChannelsPage() {
       }),
   });
 
-  // Create channel mutation
-  const createChannelMutation = useMutation({
+  const deleteChannelMutation = useMutation({
+    mutationFn: ({ projectId, channelId }: { projectId: string; channelId: string }) =>
+      deleteChannel(projectId, channelId),
+    onSuccess: (_, target) => {
+      void queryClient.invalidateQueries({ queryKey: ["notification-channels", target.projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["alert-rules", target.projectId] });
+      setChannelToDelete(null);
+      toast({ title: "Channel deleted", variant: "success" });
+    },
+    onError: (err: unknown) => toast({
+      title: "Channel deletion failed",
+      description: err instanceof Error ? err.message : "Could not delete the channel",
+      variant: "destructive",
+    }),
+  });
+
+  const saveEmailChannelMutation = useMutation({
     mutationFn: (newChannel: {
       name: string;
       channel_type: "email";
@@ -99,14 +122,16 @@ export default function NotificationChannelsPage() {
       if (!projectId) {
         throw new Error("Project ID is missing");
       }
-      return createChannel(projectId, newChannel);
+      return editingChannel
+        ? updateChannel(projectId, editingChannel.id, newChannel)
+        : createChannel(projectId, newChannel);
     },
     onSuccess: (created) => {
       queryClient.invalidateQueries({
         queryKey: ["notification-channels", projectId],
       });
       toast({
-        title: "Channel created",
+        title: editingChannel ? "Channel updated" : "Channel created",
         description: `Notification channel "${created.name}" has been configured successfully.`,
         variant: "success",
       });
@@ -116,9 +141,9 @@ export default function NotificationChannelsPage() {
       if (err instanceof ApiError && err.status === 422) {
         setFormValidationError(err.message || "Invalid channel payload");
       } else {
-        const message = err instanceof Error ? err.message : "Failed to create channel";
+        const message = err instanceof Error ? err.message : "Failed to save channel";
         toast({
-          title: "Channel creation failed",
+          title: "Channel save failed",
           description: message,
           variant: "destructive",
         });
@@ -149,9 +174,23 @@ export default function NotificationChannelsPage() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingChannel(null);
+    setEmailEnabled(true);
     setChannelName("");
     setChannelType("email");
     resetEmailFields();
+  };
+
+  const handleEditChannel = (channel: NotificationChannel) => {
+    resetEmailFields();
+    const type = channel.channelType ?? channel.channel_type;
+    if (type !== "email" && type !== "webhook") return;
+    setEditingChannel(channel);
+    setChannelType(type);
+    setChannelName(channel.name);
+    setEmailEnabled(channel.enabled);
+    if (type === "email") setRecipientEmail(channel.destination);
+    setIsModalOpen(true);
   };
 
   const handleSelectChannelType = (type: "email" | "webhook") => {
@@ -160,19 +199,27 @@ export default function NotificationChannelsPage() {
     setChannelType(type);
   };
 
-  const handleSaveWebhook = async (payload: CreateWebhookChannelPayload) => {
+  const handleSaveWebhook = async (payload: UpdateWebhookChannelPayload) => {
     if (!projectId || webhookInFlight.current) return;
     webhookInFlight.current = true;
     setIsWebhookSubmitting(true);
     try {
-      const { signingSecret } = await createWebhookChannel(projectId, payload);
+      if (editingChannel) {
+        await updateChannel(projectId, editingChannel.id, payload);
+        toast({ title: "Channel updated", variant: "success" });
+      } else {
+        const { signingSecret } = await createWebhookChannel(projectId, {
+          ...payload,
+          auth: payload.auth ?? null,
+        });
+        setWebhookConfirmation({ projectId, secret: signingSecret });
+      }
       handleCloseModal();
-      setWebhookConfirmation({ projectId, secret: signingSecret });
       void queryClient.invalidateQueries({ queryKey: ["notification-channels", projectId] });
     } catch (err) {
       toast({
-        title: "Channel creation failed",
-        description: err instanceof Error ? err.message : "Failed to create channel",
+        title: "Channel save failed",
+        description: err instanceof Error ? err.message : "Failed to save channel",
         variant: "destructive",
       });
     } finally {
@@ -200,16 +247,16 @@ export default function NotificationChannelsPage() {
     }
 
     const destination = allEmails[0]; // primary email destination
-    createChannelMutation.mutate({
+    saveEmailChannelMutation.mutate({
       name: trimmedName,
       channel_type: "email",
       destination,
-      enabled: true,
+      enabled: emailEnabled,
     });
   };
 
   const isLoading = isProjectLoading || isChannelsLoading;
-  const isSubmitting = createChannelMutation.isPending || isWebhookSubmitting;
+  const isSubmitting = saveEmailChannelMutation.isPending || isWebhookSubmitting;
   const activeCount = channels.filter((c) => c.enabled).length;
 
   return (
@@ -419,21 +466,29 @@ export default function NotificationChannelsPage() {
                         )}
                       </td>
                       <td className="py-4 px-4">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          aria-label={`Test ${channel.name}`}
-                          disabled={!projectId || testChannelMutation.isPending}
-                          onClick={() => {
-                            if (projectId) testChannelMutation.mutate({ projectId, channelId: channel.id });
-                          }}
-                        >
-                          {testChannelMutation.isPending &&
-                          testChannelMutation.variables.channelId === channel.id
-                            ? "Sending…"
-                            : "Test"}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            aria-label={`Test ${channel.name}`}
+                            disabled={!projectId || testChannelMutation.isPending}
+                            onClick={() => {
+                              if (projectId) testChannelMutation.mutate({ projectId, channelId: channel.id });
+                            }}
+                          >
+                            {testChannelMutation.isPending &&
+                            testChannelMutation.variables.channelId === channel.id
+                              ? "Sending…"
+                              : "Test"}
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => handleEditChannel(channel)}>
+                            Edit
+                          </Button>
+                          <Button type="button" size="sm" variant="destructive" onClick={() => setChannelToDelete(channel)}>
+                            Delete
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -461,7 +516,7 @@ export default function NotificationChannelsPage() {
                 </div>
                 <div>
                   <h3 id="add-channel-title" className="text-lg font-semibold text-foreground">
-                    Add Notification Channel
+                    {editingChannel ? "Edit Notification Channel" : "Add Notification Channel"}
                   </h3>
                   <p className="text-xs text-muted-foreground">
                     Set up reliable delivery endpoints for alert state transitions
@@ -471,7 +526,7 @@ export default function NotificationChannelsPage() {
               <button
                 type="button"
                 onClick={handleCloseModal}
-                disabled={isWebhookSubmitting}
+                disabled={isSubmitting}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 aria-label="Close modal"
               >
@@ -488,77 +543,78 @@ export default function NotificationChannelsPage() {
                 </div>
               )}
 
-              {/* Type Selection */}
-              <div className="space-y-2">
-                <Label className="text-xs uppercase tracking-wider text-muted-foreground">
-                  Channel Type
-                </Label>
-                <div className="grid grid-cols-3 gap-3">
-                  {/* Email Option - Default & Active */}
-                  <button
-                    type="button"
-                    onClick={() => handleSelectChannelType("email")}
-                    aria-pressed={channelType === "email"}
-                    disabled={isSubmitting}
-                    className={`p-3.5 rounded-xl text-left border transition-all flex flex-col gap-2 ${
-                      channelType === "email"
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "border-border bg-card hover:bg-muted/50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <Mail className="h-5 w-5 text-primary" />
-                      {channelType === "email" && <span className="w-2 h-2 rounded-full bg-primary" />}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-foreground">Email</div>
-                      <div className="text-xs text-muted-foreground">Managed relay</div>
-                    </div>
-                  </button>
+              {!editingChannel && (
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Channel Type
+                  </Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {/* Email Option - Default & Active */}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChannelType("email")}
+                      aria-pressed={channelType === "email"}
+                      disabled={isSubmitting}
+                      className={`p-3.5 rounded-xl text-left border transition-all flex flex-col gap-2 ${
+                        channelType === "email"
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-border bg-card hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <Mail className="h-5 w-5 text-primary" />
+                        {channelType === "email" && <span className="w-2 h-2 rounded-full bg-primary" />}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">Email</div>
+                        <div className="text-xs text-muted-foreground">Managed relay</div>
+                      </div>
+                    </button>
 
-                  {/* Slack Option - Disabled */}
-                  <button
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    className="p-3.5 rounded-xl text-left border border-border bg-muted/40 opacity-60 cursor-not-allowed flex flex-col gap-2"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <MessageSquare className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                        Soon
-                      </span>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-muted-foreground">Slack</div>
-                      <div className="text-xs text-muted-foreground">Incoming Webhook</div>
-                    </div>
-                  </button>
+                    {/* Slack Option - Disabled */}
+                    <button
+                      type="button"
+                      disabled
+                      aria-disabled="true"
+                      className="p-3.5 rounded-xl text-left border border-border bg-muted/40 opacity-60 cursor-not-allowed flex flex-col gap-2"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          Soon
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-muted-foreground">Slack</div>
+                        <div className="text-xs text-muted-foreground">Incoming Webhook</div>
+                      </div>
+                    </button>
 
-                  {/* Webhook Option */}
-                  <button
-                    type="button"
-                    onClick={() => handleSelectChannelType("webhook")}
-                    aria-pressed={channelType === "webhook"}
-                    disabled={isSubmitting}
-                    className={`p-3.5 rounded-xl text-left border transition-all flex flex-col gap-2 ${
-                      channelType === "webhook"
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "border-border bg-card hover:bg-muted/50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <Webhook className="h-5 w-5 text-primary" />
-                      {channelType === "webhook" && <span className="w-2 h-2 rounded-full bg-primary" />}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-foreground">Webhook</div>
-                      <div className="text-xs text-muted-foreground">Signed HTTP POST</div>
-                    </div>
-                  </button>
+                    {/* Webhook Option */}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChannelType("webhook")}
+                      aria-pressed={channelType === "webhook"}
+                      disabled={isSubmitting}
+                      className={`p-3.5 rounded-xl text-left border transition-all flex flex-col gap-2 ${
+                        channelType === "webhook"
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-border bg-card hover:bg-muted/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <Webhook className="h-5 w-5 text-primary" />
+                        {channelType === "webhook" && <span className="w-2 h-2 rounded-full bg-primary" />}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-foreground">Webhook</div>
+                        <div className="text-xs text-muted-foreground">Signed HTTP POST</div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
-              </div>
 
+              )}
               {/* Email Form Panel */}
               {channelType === "email" && (
                 <div className="space-y-4">
@@ -569,7 +625,7 @@ export default function NotificationChannelsPage() {
                       placeholder="e.g. Platform SRE Leads"
                       value={channelName}
                       onChange={(e) => setChannelName(e.target.value)}
-                      disabled={createChannelMutation.isPending}
+                      disabled={saveEmailChannelMutation.isPending}
                     />
                   </div>
 
@@ -598,14 +654,25 @@ export default function NotificationChannelsPage() {
                       <input
                         id="recipientEmail"
                         type="email"
-                        placeholder="Add email address and press enter..."
+                        placeholder={editingChannel ? "Recipient email address" : "Add email address and press enter..."}
                         value={recipientEmail}
                         onChange={(e) => setRecipientEmail(e.target.value)}
-                        onKeyDown={handleAddRecipient}
-                        disabled={createChannelMutation.isPending}
+                        onKeyDown={editingChannel ? undefined : handleAddRecipient}
+                        disabled={saveEmailChannelMutation.isPending}
                         className="w-full bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground"
                       />
                     </div>
+                    {editingChannel && (
+                      <Label className="mt-3 flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={emailEnabled}
+                          disabled={isSubmitting}
+                          onChange={(event) => setEmailEnabled(event.target.checked)}
+                        />
+                        Enabled
+                      </Label>
+                    )}
                     <div className="p-3 rounded-lg bg-muted/50 border border-border flex items-start gap-2.5 mt-2">
                       <Info className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
                       <p className="text-xs text-muted-foreground">
@@ -618,6 +685,7 @@ export default function NotificationChannelsPage() {
               {channelType === "webhook" && (
                 <WebhookChannelForm
                   formId={webhookFormId}
+                  editingChannel={editingChannel ?? undefined}
                   channelName={channelName}
                   onChannelNameChange={setChannelName}
                   onSave={handleSaveWebhook}
@@ -650,6 +718,20 @@ export default function NotificationChannelsPage() {
             </div>
           </div>
         </div>
+      )}
+      {channelToDelete && (
+        <ConfirmationDialog
+          title="Delete notification channel?"
+          confirmLabel="Delete channel"
+          pending={deleteChannelMutation.isPending}
+          onCancel={() => setChannelToDelete(null)}
+          onConfirm={() => {
+            if (projectId) deleteChannelMutation.mutate({ projectId, channelId: channelToDelete.id });
+          }}
+        >
+          Deleting <strong>{channelToDelete.name}</strong> also removes its alert rule
+          associations, queued deliveries, and delivery history.
+        </ConfirmationDialog>
       )}
       {webhookConfirmation && webhookConfirmation.projectId === projectId && (
         <WebhookSigningSecretDialog

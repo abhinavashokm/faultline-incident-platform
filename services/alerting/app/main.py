@@ -39,7 +39,9 @@ def create_app() -> FastAPI:
         exc: RequestValidationError,
     ) -> JSONResponse:
         errors = exc.errors()
-        if getattr(request.scope.get("route"), "name", None) == "create_notification_channel":
+        if getattr(request.scope.get("route"), "name", None) in {
+            "create_notification_channel", "update_notification_channel",
+        }:
             errors = [{key: error[key] for key in ("type", "loc", "msg")} for error in errors]
         return JSONResponse(
             status_code=422,
