@@ -11,14 +11,12 @@ import {
   MessageSquare,
   Webhook,
   X,
-  Info,
-  ShieldCheck,
-  Zap,
   ChevronRight,
   Loader2,
   AlertCircle,
   AlertTriangle,
-  Clock,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
@@ -260,11 +258,11 @@ export default function NotificationChannelsPage() {
   const activeCount = channels.filter((c) => c.enabled).length;
 
   return (
-    <div className="flex-1 space-y-6 p-6 max-w-7xl mx-auto">
+    <div className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-6 sm:px-6">
       {/* Breadcrumb & Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b pb-5">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Link
               href={`/${workspaceSlug}/${projectSlug}/alerts`}
               className="hover:text-foreground transition-colors"
@@ -272,13 +270,13 @@ export default function NotificationChannelsPage() {
               Alerts
             </Link>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-primary font-semibold">Notification Channels</span>
+            <span className="font-medium text-foreground">Channels</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Notification Channels
           </h1>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            Configure email and webhook destinations for alert dispatch in {projectSlug || "your project"}.
+            Manage where this project sends email and webhook alerts.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
@@ -292,57 +290,6 @@ export default function NotificationChannelsPage() {
         </div>
       </div>
 
-      {/* Overview Stat Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl border bg-card text-card-foreground shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-              <Radio className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-lg font-semibold">
-                {isLoading ? "--" : `${channels.length} Configured`}
-              </div>
-              <div className="text-xs text-muted-foreground">Active outbound channels</div>
-            </div>
-          </div>
-          <span className="px-2.5 py-0.5 rounded-full bg-muted text-xs font-medium text-muted-foreground">
-            {isLoading ? "--" : `${activeCount} Active`}
-          </span>
-        </div>
-
-        <div className="p-4 rounded-xl border bg-card text-card-foreground shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <Zap className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-lg font-semibold">100%</div>
-              <div className="text-xs text-muted-foreground">Avg relay delivery success</div>
-            </div>
-          </div>
-          <span className="px-2.5 py-0.5 rounded-full bg-muted text-xs font-mono text-muted-foreground">
-            TLS 1.3
-          </span>
-        </div>
-
-        <div className="p-4 rounded-xl border bg-card text-card-foreground shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-lg font-semibold">DKIM & SPF</div>
-              <div className="text-xs text-muted-foreground">Verified sender reputational seal</div>
-            </div>
-          </div>
-          <span className="px-2.5 py-0.5 rounded-full bg-muted text-xs font-mono text-muted-foreground">
-            Active
-          </span>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
       {isLoading ? (
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-2 border-b border-border">
@@ -355,7 +302,7 @@ export default function NotificationChannelsPage() {
           </div>
         </div>
       ) : isChannelsError && channels.length === 0 ? (
-        <div className="flex min-h-[340px] flex-col items-center justify-center rounded-xl border border-dashed border-error/40 p-8 text-center bg-error-container/10">
+        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed border-error/40 p-8 text-center bg-error-container/10">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-error/10 text-error mb-4">
             <AlertTriangle className="h-7 w-7" />
           </div>
@@ -371,7 +318,7 @@ export default function NotificationChannelsPage() {
         </div>
       ) : channels.length === 0 ? (
         /* Empty State */
-        <div className="flex min-h-[380px] flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center bg-card/40">
+        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-xl border border-dashed p-8 text-center bg-card/40">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
             <Radio className="h-8 w-8" />
           </div>
@@ -379,7 +326,7 @@ export default function NotificationChannelsPage() {
             No notification channels configured
           </h2>
           <p className="text-sm text-muted-foreground max-w-md mb-6">
-            Add your first notification destination to receive real-time alerts when incidents or errors trigger.
+            Add an email address or webhook to receive alerts.
           </p>
           <Button
             onClick={() => setIsModalOpen(true)}
@@ -391,47 +338,47 @@ export default function NotificationChannelsPage() {
         </div>
       ) : (
         /* Channels Table */
-        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <section aria-label="Notification channels" className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3">
+            <span className="text-sm font-medium text-foreground">
+              {channels.length} {channels.length === 1 ? "channel" : "channels"}
+            </span>
+            <span className="text-xs text-muted-foreground">{activeCount} enabled</span>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full min-w-[640px] border-collapse text-left">
               <thead>
-                <tr className="border-b border-border bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <th className="py-3.5 px-4">Channel Name</th>
-                  <th className="py-3.5 px-4">Type</th>
-                  <th className="py-3.5 px-4">Destination</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4">Created</th>
-                  <th className="py-3.5 px-4">Actions</th>
+                <tr className="border-b border-border bg-muted/30 text-xs text-muted-foreground">
+                  <th scope="col" className="px-4 py-3 font-medium">Channel</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Destination</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Status</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Created</th>
+                  <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border text-sm">
                 {channels.map((channel) => {
-                  const isWebhook = (channel.channelType || channel.channel_type) === "webhook";
+                  const channelType = channel.channelType ?? channel.channel_type;
+                  const isWebhook = channelType === "webhook";
+                  const destination = isWebhook ? new URL(channel.destination).host : channel.destination;
                   const createdAt = channel.createdAt || channel.created_at;
                   return (
                     <tr key={channel.id} className="hover:bg-muted/30 transition-colors">
                       <td className="py-4 px-4 font-medium text-foreground">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                             {isWebhook ? <Webhook className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
                           </div>
                           <div>
-                            <div className="font-semibold text-foreground">{channel.name}</div>
-                            <div className="text-xs text-muted-foreground font-mono">{channel.id.slice(0, 8)}...</div>
+                            <div className="break-words font-medium text-foreground">{channel.name}</div>
+                            <div className="text-xs font-normal text-muted-foreground">
+                              {isWebhook ? "Webhook" : "Email"}
+                            </div>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-muted text-xs font-mono uppercase text-foreground">
-                          {isWebhook ? "webhook" : channel.channelType || channel.channel_type || "email"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-xs text-foreground bg-surface-container px-2 py-1 rounded">
-                            {isWebhook ? new URL(channel.destination).host : channel.destination}
-                          </span>
-                        </div>
+                      <td className="px-4 py-4 text-muted-foreground">
+                        <span className="block max-w-56 truncate" title={destination}>{destination}</span>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap">
                         <span
@@ -446,31 +393,25 @@ export default function NotificationChannelsPage() {
                               channel.enabled ? "bg-emerald-500" : "bg-muted-foreground"
                             }`}
                           />
-                          {channel.enabled ? "Active" : "Disabled"}
+                          {channel.enabled ? "Enabled" : "Disabled"}
                         </span>
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap text-xs text-muted-foreground">
-                        {createdAt ? (
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
-                            <span>
-                              {new Date(createdAt).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </span>
-                          </div>
-                        ) : (
-                          "--"
-                        )}
+                        {createdAt
+                          ? new Date(createdAt).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "—"}
                       </td>
                       <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
+                            className="mr-1 min-w-14"
                             aria-label={`Test ${channel.name}`}
                             disabled={!projectId || testChannelMutation.isPending}
                             onClick={() => {
@@ -482,11 +423,27 @@ export default function NotificationChannelsPage() {
                               ? "Sending…"
                               : "Test"}
                           </Button>
-                          <Button type="button" size="sm" variant="outline" onClick={() => handleEditChannel(channel)}>
-                            Edit
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 text-muted-foreground"
+                            aria-label={`Edit ${channel.name}`}
+                            title="Edit channel"
+                            onClick={() => handleEditChannel(channel)}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
                           </Button>
-                          <Button type="button" size="sm" variant="destructive" onClick={() => setChannelToDelete(channel)}>
-                            Delete
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            aria-label={`Delete ${channel.name}`}
+                            title="Delete channel"
+                            onClick={() => setChannelToDelete(channel)}
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
                           </Button>
                         </div>
                       </td>
@@ -496,7 +453,7 @@ export default function NotificationChannelsPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
       )}
 
       {/* Add Notification Channel Modal */}
@@ -518,9 +475,6 @@ export default function NotificationChannelsPage() {
                   <h3 id="add-channel-title" className="text-lg font-semibold text-foreground">
                     {editingChannel ? "Edit Notification Channel" : "Add Notification Channel"}
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Set up reliable delivery endpoints for alert state transitions
-                  </p>
                 </div>
               </div>
               <button
@@ -673,12 +627,6 @@ export default function NotificationChannelsPage() {
                         Enabled
                       </Label>
                     )}
-                    <div className="p-3 rounded-lg bg-muted/50 border border-border flex items-start gap-2.5 mt-2">
-                      <Info className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-muted-foreground">
-                        Email delivery infrastructure is automatically managed by Faultline with built-in SPF, DKIM, and TLS 1.3 verification.
-                      </p>
-                    </div>
                   </div>
                 </div>
               )}
