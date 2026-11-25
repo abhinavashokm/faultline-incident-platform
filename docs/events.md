@@ -2,10 +2,20 @@
 
 The `libs/events` library provides versioned event contracts and schemas shared across Faultline services.
 
+| Kafka topic | Producer | Consumer | Partition key | Schema |
+|---|---|---|---|---|
+| `error-events` | Ingestion | Processing error worker | `project_id` | Shared envelope with the [`NormalizedErrorEvent`](../services/ingestion/app/schemas/event.py) |
+| `performance-metrics` | Ingestion | Processing performance worker | `project_id` | Shared envelope with the [`NormalizedPerformanceBatch`](../services/ingestion/app/schemas/performance.py) |
+| `issue-events` | Processing error worker | Alerting evaluation worker | `issue_id` | `IssueCreatedEvent`, shown below |
+
+Ingestion and Processing default to `performance-metrics`, which is also the topic created by Compose. The shared package currently defines `TOPIC_PERF_METRICS` as `perf-metrics`.
+
+[Shared envelope and topic definitions](../libs/events/src/faultline_events/envelope.py)
+
 ## Architecture Principles
 1. **No Business Logic**: Only Pydantic models, event envelope structures, and topic constants live here.
 2. **Discriminated Unions**: Event variations are modeled as discriminated unions on `event_type`, enabling single-model additions for new event types.
-3. **Immutability & Tenant Isolation**: Every event envelope includes `event_id`, `workspace_id`, `project_id`, `schema_version`, and `occurred_at`.
+3. **Immutability & Tenant Isolation**: The issue event envelope includes `event_id`, `workspace_id`, `project_id`, `schema_version`, and `occurred_at`.
 
 ---
 

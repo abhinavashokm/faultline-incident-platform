@@ -37,7 +37,8 @@ cp .env.example .env
 cp services/control-plane/.env.example  services/control-plane/.env
 cp services/ingestion/.env.example      services/ingestion/.env
 cp services/processing/.env.example     services/processing/.env
-cp deploy/migrate/.env.example          deploy/migrate/.env
+cp services/gateway/.env.example        services/gateway/.env
+cp services/alerting/.env.example       services/alerting/.env
 ```
 
 > **Important:** In the service `.env` files the `localhost` references are only used for local (non-Docker) development. When running via compose, the `environment:` block in `docker-compose.yml` overrides those values with the correct container hostnames automatically.
@@ -56,8 +57,7 @@ Secrets that **must** be changed before first run:
 
 ```bash
 # 1. First-time setup
-cp .env.example .env
-# … edit .env, create keys (see above) …
+# Create the environment files and keys using the steps above.
 
 # 2. Start everything
 make up
@@ -74,9 +74,11 @@ Services and their ports once healthy:
 
 | Service | URL |
 |---|---|
-| Control Plane API | http://localhost:8000 |
+| Gateway | http://localhost:8000 |
+| Control Plane API | http://localhost:8010 |
 | Ingestion API | http://localhost:8001 |
 | Processing API | http://localhost:8002 |
+| Alerting API | http://localhost:8003 |
 | Frontend (Next.js) | http://localhost:3000 |
 | Mailpit UI (email) | http://localhost:8025 |
 | Postgres | localhost:5432 |
@@ -85,6 +87,8 @@ Services and their ports once healthy:
 
 ---
 
+The interactive API references are available for [Control Plane](http://localhost:8010/docs), [Ingestion](http://localhost:8001/docs), [Processing](http://localhost:8002/docs), and [Alerting](http://localhost:8003/docs).
+
 ## Compose Profiles
 
 Services are grouped by profile so you can start only what you need:
@@ -92,7 +96,7 @@ Services are grouped by profile so you can start only what you need:
 | Profile | Services started |
 |---|---|
 | *(none)* | postgres, kafka, mailpit, redis (infra always) |
-| `backend` | + migrate, control-plane, ingestion, processing-api, processing-worker-errors, processing-worker-perf |
+| `backend` | + migrate, gateway, control-plane, ingestion, Processing API and workers, Alerting API and workers |
 | `frontend` | + frontend |
 
 The root `.env` sets `COMPOSE_PROFILES=backend,frontend` by default, so `docker compose up -d` starts everything.
@@ -112,17 +116,7 @@ COMPOSE_PROFILES=backend,frontend docker compose up -d
 
 ## Startup Order
 
-```
-postgres (healthy)
-    └─► migrate (runs alembic for control-plane + processing, then exits)
-            ├─► control-plane (healthy) ──► ingestion
-            └─► processing-api
-            └─► processing-worker-errors
-            └─► processing-worker-perf
-kafka (healthy) ──► ingestion, processing-api, processing-worker-errors, processing-worker-perf
-redis (healthy) ──► ingestion
-control-plane (healthy) ──► frontend
-```
+Compose waits for PostgreSQL before running the migration job for Control Plane, Processing, and Alerting. Kafka initialization creates the topics used by the workers. The gateway waits for its upstream services to become healthy. Use `make ps` and `make logs` to diagnose startup failures.
 
 ---
 
@@ -136,7 +130,7 @@ make ps          # Show container status
 make rebuild     # Rebuild all images without cache
 make migrate     # Run migrations manually
 make psql        # Open psql shell on postgres
-make test        # Run pytest in each backend container
+make test        # Run pytest in control-plane, ingestion, and processing-api
 make reset-db    # ⚠️ Destroy postgres volume and restart
 ```
 
@@ -144,7 +138,7 @@ make reset-db    # ⚠️ Destroy postgres volume and restart
 
 ## Hot Reload (Development)
 
-All backend services bind-mount their `app/` directory into the container and run uvicorn with `--reload`. Editing Python source on the host triggers an automatic reload inside the container.
+Backend API containers bind-mount their `app/` directories and run Uvicorn with `--reload`. Restart worker containers after editing worker code.
 
 The frontend runs `npm run dev` (Next.js dev server) with `WATCHPACK_POLLING=true` so HMR works correctly on Linux hosts. The `frontend_node_modules` named volume prevents the host bind-mount from overwriting the container's `node_modules`.
 
@@ -152,7 +146,7 @@ The frontend runs `npm run dev` (Next.js dev server) with `WATCHPACK_POLLING=tru
 
 ## Running Migrations Manually
 
-Migrations are run automatically by the `migrate` container at startup. To run them again manually:
+Migrations for Control Plane, Processing, and Alerting run automatically in the `migrate` container at startup. To run them again manually:
 
 ```bash
 make migrate
@@ -183,14 +177,7 @@ All Python service images use a **multi-stage build** (`builder` → `final`) fr
 1. **builder** – installs shared libs and the service into `/install` using `pip install --prefix`
 2. **final** – copies `/install` into a clean `python:3.12-slim` image; runs as a non-root `appuser`
 
-Shared libraries installed per service:
-
-| Service | Shared lib |
-|---|---|
-| control-plane | `faultline-auth` |
-| ingestion | `faultline-events` |
-| processing-api / processing-worker-errors / processing-worker-perf | `faultline-auth` |
-| migrate | `faultline-auth` (control-plane dep) |
+For service ownership and shared contracts, see [Architecture](architecture.md).
 
 ---
 
@@ -218,6 +205,5 @@ When an email notification channel is created:
 
 ## Known Gaps
 
-- **No CORSMiddleware** is present in any backend service. If the frontend needs to call the APIs directly from the browser (not via a proxy), CORS headers must be added to control-plane, ingestion, and processing-api.
-- **alerting, incident, investigation** services are not yet implemented and have no compose entries.
+- **Incident and investigation** are planned and have no Compose entries.
 - **Dead-letter queue** for Kafka consumer permanent failures is planned but not yet implemented.
