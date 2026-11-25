@@ -411,7 +411,11 @@ export default function NotificationChannelsPage() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="mr-1 min-w-14"
+                            className="mr-1 min-w-24 gap-2"
+                            aria-busy={
+                              testChannelMutation.isPending &&
+                              testChannelMutation.variables.channelId === channel.id
+                            }
                             aria-label={`Test ${channel.name}`}
                             disabled={!projectId || testChannelMutation.isPending}
                             onClick={() => {
@@ -419,15 +423,20 @@ export default function NotificationChannelsPage() {
                             }}
                           >
                             {testChannelMutation.isPending &&
-                            testChannelMutation.variables.channelId === channel.id
-                              ? "Sending…"
-                              : "Test"}
+                            testChannelMutation.variables.channelId === channel.id ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                                Sending…
+                              </>
+                            ) : (
+                              "Test"
+                            )}
                           </Button>
                           <Button
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="h-9 w-9 text-muted-foreground"
+                            className="text-text-secondary"
                             aria-label={`Edit ${channel.name}`}
                             title="Edit channel"
                             onClick={() => handleEditChannel(channel)}
@@ -438,7 +447,7 @@ export default function NotificationChannelsPage() {
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="h-9 w-9 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            className="text-text-secondary hover:bg-destructive-container hover:text-error-foreground"
                             aria-label={`Delete ${channel.name}`}
                             title="Delete channel"
                             onClick={() => setChannelToDelete(channel)}
@@ -477,15 +486,16 @@ export default function NotificationChannelsPage() {
                   </h3>
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={handleCloseModal}
                 disabled={isSubmitting}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 aria-label="Close modal"
               >
-                <X className="h-4 w-4" />
-              </button>
+                <X className="h-4 w-4" aria-hidden="true" />
+              </Button>
             </div>
 
             {/* Modal Body */}
@@ -656,12 +666,13 @@ export default function NotificationChannelsPage() {
                 form={channelType === "webhook" ? webhookFormId : undefined}
                 disabled={isSubmitting || (channelType === "webhook" && !projectId)}
                 onClick={channelType === "email" ? handleSaveChannel : undefined}
-                className="gap-2"
+                className="min-w-32 gap-2"
+                aria-busy={isSubmitting}
               >
                 {isSubmitting && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 )}
-                Save Channel
+                {isSubmitting ? "Saving…" : "Save channel"}
               </Button>
             </div>
           </div>

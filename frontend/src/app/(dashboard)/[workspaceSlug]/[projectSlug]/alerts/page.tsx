@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Bell, Radio, SlidersHorizontal } from "lucide-react";
+import { Bell, Plus, Radio, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AlertsPage() {
@@ -25,7 +25,7 @@ export default function AlertsPage() {
             View fired alerts and manage notification destinations for {projectSlug || "your project"}.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
           <Button
             variant="outline"
             className="gap-2"
@@ -33,16 +33,17 @@ export default function AlertsPage() {
           >
             <Link href={channelsHref}>
               <Radio className="h-4 w-4" />
-              Manage notification channels
+              Notification channels
             </Link>
           </Button>
           <Button
+            variant="outline"
             className="gap-2"
             asChild
           >
             <Link href={rulesHref}>
               <SlidersHorizontal className="h-4 w-4" />
-              Manage rules
+              Alert rules
             </Link>
           </Button>
         </div>
@@ -59,27 +60,12 @@ export default function AlertsPage() {
         <p className="text-sm text-muted-foreground max-w-md mb-6">
           Set up automated alert rules to trigger when issues, spikes, or error regressions occur in real time.
         </p>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="gap-2"
-            asChild
-          >
-            <Link href={channelsHref}>
-              <Radio className="h-4 w-4" />
-              Manage notification channels
-            </Link>
-          </Button>
-          <Button
-            className="gap-2"
-            asChild
-          >
-            <Link href={rulesHref}>
-              <SlidersHorizontal className="h-4 w-4" />
-              Manage rules
-            </Link>
-          </Button>
-        </div>
+        <Button asChild className="gap-2">
+          <Link href={`${rulesHref}/new`}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Create alert rule
+          </Link>
+        </Button>
       </div>
     </div>
   );
