@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-import { createIncident, type IncidentSeverity } from "@/features/incidents/api";
+import { createIncident, incidentsQueryKey, type IncidentSeverity } from "@/features/incidents/api";
 import { useProjectBySlug } from "@/features/projects/hooks";
 
 const severities: { value: IncidentSeverity; label: string }[] = [
@@ -27,6 +27,7 @@ export default function CreateIncidentPage({
   params: { workspaceSlug: string; projectSlug: string };
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const listHref = `/${params.workspaceSlug}/${params.projectSlug}/incidents`;
   const { project, isLoading, isError } = useProjectBySlug(params.projectSlug);
   const [title, setTitle] = useState("");
@@ -41,7 +42,8 @@ export default function CreateIncidentPage({
         description: description.trim() || undefined,
       }),
     retry: false,
-    onSuccess: (incident) => {
+    onSuccess: (incident, projectId) => {
+      void queryClient.invalidateQueries({ queryKey: incidentsQueryKey(projectId) });
       toast({ title: "Incident created", description: incident.title, variant: "success" });
       router.replace(listHref);
     },

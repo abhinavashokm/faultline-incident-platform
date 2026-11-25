@@ -1,6 +1,9 @@
 # Faultline Incident Service
 
 - `GET /health` reports process liveness.
+- `GET /api/v1/projects/{project_id}/incidents` returns the project's incidents
+  newest first. Each row includes `id`, `title`, `severity`, `status`,
+  `assignee_id`, and `started_at`.
 - `POST /api/v1/projects/{project_id}/incidents` creates an incident in the
   active workspace and returns its ID, title, severity, and status.
 
@@ -51,7 +54,15 @@ curl --fail-with-body -X POST "http://localhost:8004/api/v1/projects/${PROJECT_I
 
 The Compose backend profile exposes the endpoint through the gateway on port
 `8000`. Run `docker compose --profile backend up -d --build gateway` and use
-port `8000` in the creation request above. For a standalone gateway, enable
+port `8000` in the creation request above. Compose mounts and reloads the
+Incident application source during development. To recreate an existing
+Incident container with that configuration, run:
+
+```sh
+docker compose --profile backend up -d --build incident
+```
+
+For a standalone gateway, enable
 `GATEWAY_ENABLE_INCIDENT` and set `GATEWAY_UPSTREAM_INCIDENT_URL` to the
 running service.
 

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.incidents.models import Incident, IncidentIssue, IncidentTimelineEntry
 from app.incidents.repository import IncidentRepository
-from app.incidents.schemas import CreatedIncident, CreateIncidentRequest, IssueSnapshot
+from app.incidents.schemas import CreatedIncident, CreateIncidentRequest, IncidentListItem, IssueSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +45,22 @@ class IncidentService:
             raise HTTPException(503, "Resource verification temporarily unavailable")
         return response
 
+    async def _verify_project(self, project_id: UUID, token: str) -> None:
+        control_plane = str(self.settings.control_plane_url).rstrip("/")
+        await self._get_resource(f"{control_plane}/api/v1/projects/{project_id}", token, "Project")
+
+    async def list_for_project(
+        self, project_id: UUID, principal: Principal, token: str
+    ) -> list[IncidentListItem]:
+        await self._verify_project(project_id, token)
+        incidents = await self.repository.list_for_project(principal.workspace_id, project_id)
+        return [IncidentListItem.model_validate(incident) for incident in incidents]
+
     async def create(
         self, project_id: UUID, payload: CreateIncidentRequest, principal: Principal, token: str
     ) -> CreatedIncident:
         project_path = f"/api/v1/projects/{project_id}"
-        control_plane = str(self.settings.control_plane_url).rstrip("/")
-        await self._get_resource(f"{control_plane}{project_path}", token, "Project")
+        await self._verify_project(project_id, token)
 
         # The MVP supports self-assignment within the verified active workspace.
         if payload.assignee_id is not None and payload.assignee_id != principal.user_id:

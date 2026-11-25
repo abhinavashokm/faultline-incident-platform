@@ -7,10 +7,24 @@ from faultline_auth import Principal, get_principal, http_bearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
-from app.incidents.schemas import CreatedIncident, CreateIncidentRequest
+from app.incidents.schemas import CreatedIncident, CreateIncidentRequest, IncidentListItem
 from app.incidents.service import IncidentService
 
 router = APIRouter(tags=["incidents"])
+
+
+@router.get("/projects/{project_id}/incidents", response_model=list[IncidentListItem])
+async def list_incidents(
+    project_id: UUID,
+    request: Request,
+    principal: Annotated[Principal, Depends(get_principal)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(http_bearer)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> list[IncidentListItem]:
+    service = IncidentService(
+        session, request.app.state.http_client, request.app.state.settings
+    )
+    return await service.list_for_project(project_id, principal, credentials.credentials)
 
 
 @router.post(

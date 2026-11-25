@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_serializer
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
 Severity = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)]
@@ -23,6 +23,17 @@ class CreatedIncident(BaseModel):
     status: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class IncidentListItem(CreatedIncident):
+    assignee_id: UUID | None = Field(validation_alias="assigned_to")
+    started_at: datetime
+
+    @field_serializer("started_at")
+    def serialize_started_at(self, value: datetime) -> str:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
 
 
 class IssueSnapshot(BaseModel):
