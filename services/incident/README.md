@@ -46,8 +46,11 @@ curl --fail-with-body -X POST "http://localhost:8004/api/v1/projects/${PROJECT_I
   -d '{"title":"Payment processing failures","severity":"high"}'
 ```
 
-The gateway can expose the same endpoint when `GATEWAY_ENABLE_INCIDENT` is
-enabled and `GATEWAY_UPSTREAM_INCIDENT_URL` points to the running service.
+The Compose backend profile exposes the endpoint through the gateway on port
+`8000`. Run `docker compose --profile backend up -d --build gateway` and use
+port `8000` in the creation request above. For a standalone gateway, enable
+`GATEWAY_ENABLE_INCIDENT` and set `GATEWAY_UPSTREAM_INCIDENT_URL` to the
+running service.
 
 ## Run in Docker
 

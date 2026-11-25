@@ -81,8 +81,9 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
     - Ingestion:
       - /api/v1/ingest (SDK event and performance batch intake)
     
-    Unimplemented future services (commented out / disabled by config):
     - Alerting: /api/v1/projects/{project_id}/alerts
+
+    Configurable routes:
     - Incident: /api/v1/projects/{project_id}/incidents
     - Investigation: /api/v1/projects/{project_id}/investigations
     """
@@ -159,7 +160,6 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
         ),
     ]
 
-    # Future / unreleased services (disabled by config)
     if settings.enable_incident:
         routes.append(
             RouteEntry(

@@ -132,6 +132,8 @@ services:
       GATEWAY_UPSTREAM_INGESTION_URL: http://ingestion:8001
       GATEWAY_UPSTREAM_PROCESSING_URL: http://processing-api:8002
       GATEWAY_UPSTREAM_ALERTING_URL: http://alerting:8003
+      GATEWAY_UPSTREAM_INCIDENT_URL: http://incident:8004
+      GATEWAY_ENABLE_INCIDENT: "true"
       GATEWAY_REDIS_URL: redis://redis:6379/0
     depends_on:
       control-plane:
@@ -141,6 +143,8 @@ services:
       processing-api:
         condition: service_healthy
       alerting:
+        condition: service_healthy
+      incident:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -359,6 +363,36 @@ services:
       timeout: 5s
       retries: 10
       start_period: 15s
+    logging: *default-logging
+    restart: unless-stopped
+    profiles:
+      - backend
+
+  incident:
+    build:
+      context: .
+      dockerfile: services/incident/Dockerfile
+    environment:
+      INCIDENT_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/incident
+      INCIDENT_CONTROL_PLANE_URL: http://control-plane:8000
+      INCIDENT_PROCESSING_URL: http://processing-api:8002
+      AUTH_PROVIDER: jwks
+      AUTH_JWKS_URL: http://control-plane:8000/.well-known/jwks.json
+      AUTH_ISSUER: faultline-control-plane
+      AUTH_AUDIENCE: faultline
+    depends_on:
+      postgres:
+        condition: service_healthy
+      control-plane:
+        condition: service_healthy
+      processing-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8004/health', timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     logging: *default-logging
     restart: unless-stopped
     profiles:
