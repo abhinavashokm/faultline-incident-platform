@@ -27,8 +27,10 @@ export default function DashboardLayout({
 
   const isProjectsList = pathname === `/${workspaceSlug}/projects`;
   const isProjectsNew = pathname.endsWith("/projects/new");
-  const isProjectsSetup = pathname.includes("/projects/") && pathname.endsWith("/setup");
-  const isFocusedFlow = isProjectsList || isProjectsNew || isProjectsSetup;
+  const projectPath = `/${workspaceSlug}/projects/${params.slug}`;
+  const isProjectDetail = typeof params.slug === "string" && pathname === projectPath;
+  const isProjectsSetup = typeof params.slug === "string" && pathname === `${projectPath}/setup`;
+  const isFocusedFlow = isProjectsList || isProjectDetail || isProjectsNew || isProjectsSetup;
 
   // If the workspace has no projects, redirect to the new project creation page.
   // Use router.replace so the previous dashboard URL is not left in history.
@@ -40,7 +42,7 @@ export default function DashboardLayout({
   }, [projectsLoading, projects, isFocusedFlow, workspaceSlug, router]);
 
   // Show a full-page spinner while loading or while the zero-projects redirect is pending
-  if (!isProjectsList && (projectsLoading || (!isFocusedFlow && projects && projects.length === 0))) {
+  if (!isProjectsList && !isProjectDetail && (projectsLoading || (!isFocusedFlow && projects && projects.length === 0))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-canvas">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

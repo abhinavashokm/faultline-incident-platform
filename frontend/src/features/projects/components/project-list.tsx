@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { ArrowRight, FolderOpen, Plus, Trash2, Zap } from "lucide-react";
+import { FolderOpen, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -70,14 +70,21 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <li key={project.id} className="min-w-0">
-              <Card className="flex h-full flex-col transition-colors focus-within:border-border-hover hover:border-border-hover">
+              <Card className="relative isolate flex h-full flex-col transition-colors focus-within:border-border-hover hover:border-border-hover">
                 <div className="flex-1 p-5">
                   <div className="flex items-start gap-3">
                     <div className="shrink-0 rounded-md bg-primary-tint p-2 text-primary">
                       <FolderOpen aria-hidden="true" className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <h2 className="break-words text-body-md font-semibold">{project.name}</h2>
+                      <h2 className="break-words text-body-md font-semibold">
+                        <Link
+                          href={`${workspacePath}/projects/${project.slug}`}
+                          className="outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-primary"
+                        >
+                          {project.name}
+                        </Link>
+                      </h2>
                       <p className="mt-0.5 break-words font-mono text-label-sm text-text-muted">
                         {project.slug}
                       </p>
@@ -87,7 +94,7 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="-mr-2 ml-auto shrink-0 hover:bg-error-container hover:text-error"
+                        className="relative z-10 -mr-2 ml-auto shrink-0 hover:bg-error-container hover:text-error"
                         aria-label={`Delete ${project.name}`}
                         title="Delete project"
                         onClick={() => {
@@ -99,33 +106,28 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
                       </Button>
                     )}
                   </div>
-                  {project.description && (
-                    <p className="mt-4 break-words text-body-sm text-text-secondary">{project.description}</p>
-                  )}
                   {project.platform && (
                     <Badge
                       variant={project.platform === "fastapi" ? "success" : "default"}
                       showDot={false}
-                      className="mt-3 max-w-full break-all font-sans normal-case tracking-normal"
+                      className={`mt-3 max-w-full break-all font-sans normal-case tracking-normal${project.platform === "fastapi" ? " px-1.5 py-0" : ""}`}
                     >
-                      <span className="flex items-center gap-1.5">
-                        {project.platform === "fastapi" && (
-                          <Zap aria-hidden="true" className="h-3 w-3 shrink-0" />
-                        )}
+                      <span className={project.platform === "fastapi" ? "text-[0.9em]" : undefined}>
                         {PLATFORM_REGISTRY[project.platform]?.label ?? project.platform}
                       </span>
                     </Badge>
                   )}
+                  {project.description && (
+                    <p className="mt-4 break-words text-body-sm text-text-secondary">{project.description}</p>
+                  )}
                 </div>
-                <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-2">
-                  <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
-                    <Link href={`${workspacePath}/${project.slug}/overview`} aria-label={`Open ${project.name}`}>
-                      Open project
-                      <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                  {canManageProjects && <ProjectEditDialog project={project} />}
-                </div>
+                {canManageProjects && (
+                  <div className="flex justify-end border-t border-border px-5 py-2">
+                    <div className="relative z-10">
+                      <ProjectEditDialog project={project} />
+                    </div>
+                  </div>
+                )}
               </Card>
             </li>
           ))}
