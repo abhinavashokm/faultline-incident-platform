@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -57,6 +57,15 @@ export default function NotificationChannelsPage() {
   const [channelToDelete, setChannelToDelete] = useState<NotificationChannel | null>(null);
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const channelDialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+
+    const dialog = channelDialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, [isModalOpen]);
   const [channelType, setChannelType] = useState<"email" | "webhook">("email");
   const [channelName, setChannelName] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
@@ -467,13 +476,17 @@ export default function NotificationChannelsPage() {
 
       {/* Add Notification Channel Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in-50">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="add-channel-title"
-            className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col rounded-2xl bg-card border border-border shadow-2xl overflow-hidden animate-in zoom-in-95"
-          >
+        <dialog
+          ref={channelDialogRef}
+          aria-labelledby="add-channel-title"
+          aria-busy={isSubmitting}
+          onCancel={(event) => {
+            event.preventDefault();
+            if (!isSubmitting) handleCloseModal();
+          }}
+          className="fixed inset-auto left-1/2 top-1/2 m-0 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl backdrop:bg-black/50"
+        >
+          <div className="flex max-h-[calc(100dvh-2rem-2px)] flex-col">
             {/* Modal Header */}
             <div className="shrink-0 px-6 py-5 border-b border-border flex items-center justify-between bg-card">
               <div className="flex items-center gap-3">
@@ -492,14 +505,15 @@ export default function NotificationChannelsPage() {
                 size="icon"
                 onClick={handleCloseModal}
                 disabled={isSubmitting}
-                aria-label="Close modal"
+                autoFocus
+                aria-label="Close notification channel dialog"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
 
             {/* Modal Body */}
-            <div className="min-h-0 p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+            <div className="min-h-0 p-6 space-y-6 overflow-y-auto">
               {formValidationError && (
                 <div className="flex items-center gap-2.5 rounded-lg border border-error/30 bg-error-container p-3.5 text-error text-body-sm font-medium">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -676,7 +690,7 @@ export default function NotificationChannelsPage() {
               </Button>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
       {channelToDelete && (
         <ConfirmationDialog

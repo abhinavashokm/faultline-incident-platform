@@ -35,7 +35,7 @@ export function ConfirmationDialog({
         event.preventDefault();
         if (!pending) onCancel();
       }}
-      className="m-auto w-11/12 max-w-md rounded-2xl border bg-card p-6 text-card-foreground shadow-2xl backdrop:bg-black/50"
+      className="fixed inset-auto left-1/2 top-1/2 m-0 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100dvh-2rem)] w-11/12 max-w-md overflow-y-auto rounded-2xl border bg-card p-6 text-card-foreground shadow-2xl backdrop:bg-black/50"
     >
       <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
       <div id={descriptionId} className="mt-3 text-sm text-muted-foreground">{children}</div>
