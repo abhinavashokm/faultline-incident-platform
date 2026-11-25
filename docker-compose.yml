@@ -333,6 +333,7 @@ services:
     env_file:
       - ./services/alerting/.env
     environment:
+      ALERTING_CONTROL_PLANE_URL: http://control-plane:8000
       ALERTING_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/alerting
       ALERTING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       ALERTING_SMTP_HOST: mailpit

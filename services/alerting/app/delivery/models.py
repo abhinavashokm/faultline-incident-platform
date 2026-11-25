@@ -18,11 +18,15 @@ class NotificationChannel(Base):
     """External destination where alerts are delivered."""
 
     __tablename__ = "notification_channels"
-    __table_args__ = {"schema": SCHEMA}
+    __table_args__ = (
+        Index("ix_alerting_notification_channels_workspace_project", "workspace_id", "project_id"),
+        {"schema": SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     channel_type: Mapped[str] = mapped_column(String(30), nullable=False)
@@ -89,6 +93,7 @@ class Delivery(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     alert_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

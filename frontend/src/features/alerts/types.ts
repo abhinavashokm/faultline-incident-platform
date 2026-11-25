@@ -7,8 +7,8 @@ export type RuleType = "new_issue";
 export interface NotificationChannel {
   id: string; // uuid
   name: string;
-  channel_type?: "email";
-  channelType?: "email";
+  channel_type?: "email" | "webhook";
+  channelType?: "email" | "webhook";
   destination: string;
   enabled: boolean;
   created_at?: string;
@@ -68,3 +68,12 @@ export const createAlertRuleSchema = z.object({
 });
 
 export type CreateAlertRuleFormData = z.infer<typeof createAlertRuleSchema>;
+
+export interface AlertRuleListResponse {
+  items: AlertRule[];
+  meta: {
+    limit: number;
+    has_more: boolean;
+    next_cursor: string | null;
+  };
+}

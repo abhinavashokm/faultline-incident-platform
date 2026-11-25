@@ -55,6 +55,17 @@ class AlertRuleResponse(AlertRuleBase):
     updated_at: datetime | None = None
 
 
+class AlertRulePaginationMeta(BaseModel):
+    limit: int
+    has_more: bool
+    next_cursor: str | None = None
+
+
+class AlertRuleListResponse(BaseModel):
+    items: list[AlertRuleResponse]
+    meta: AlertRulePaginationMeta
+
+
 class AlertResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

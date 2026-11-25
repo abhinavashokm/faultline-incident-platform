@@ -210,11 +210,12 @@ export function AlertRulesList({
                             size="sm"
                             disabled={togglingId === rule.id}
                             onClick={() => handleToggle(rule.id)}
-                            className="h-8 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+                            className="min-w-20 gap-1.5 text-text-secondary"
+                            aria-busy={togglingId === rule.id}
                             title={rule.enabled ? "Disable rule" : "Enable rule"}
                           >
                             {togglingId === rule.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                             ) : null}
                             {rule.enabled ? "Disable" : "Enable"}
                           </Button>
@@ -222,10 +223,11 @@ export function AlertRulesList({
                         {onDeleteRule && (
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             disabled={isDeleting}
+                            aria-busy={isDeleting}
                             onClick={() => setRuleToDelete(rule)}
-                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                            className="text-text-secondary hover:bg-destructive-container hover:text-error-foreground"
                             title="Delete alert rule"
                           >
                             {isDeleting ? (
@@ -286,12 +288,13 @@ export function AlertRulesList({
                 type="button"
                 disabled={deletingId === ruleToDelete.id}
                 onClick={confirmDelete}
-                className="gap-2"
+                className="min-w-32 gap-2"
+                aria-busy={deletingId === ruleToDelete.id}
               >
                 {deletingId === ruleToDelete.id && (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
-                Delete Rule
+                {deletingId === ruleToDelete.id ? "Deleting…" : "Delete rule"}
               </Button>
             </div>
           </div>

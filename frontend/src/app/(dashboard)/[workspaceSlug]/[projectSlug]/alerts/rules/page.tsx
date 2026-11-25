@@ -3,14 +3,13 @@
 import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronRight,
   Plus,
   SlidersHorizontal,
   Bell,
   AlertTriangle,
-  Loader2,
   ShieldCheck,
   Zap,
 } from "lucide-react";
@@ -25,7 +24,6 @@ import {
   deleteAlertRule,
   toggleAlertRule,
 } from "@/features/alerts/api/alertRulesApi";
-import { AlertRule } from "@/features/alerts/types";
 
 export default function AlertRulesPage() {
   const params = useParams();
@@ -43,19 +41,26 @@ export default function AlertRulesPage() {
 
   // Fetch alert rules with React Query
   const {
-    data: rules = [],
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
     isLoading: isRulesLoading,
     isError,
     error,
     refetch,
-  } = useQuery({
-    queryKey: ["alert-rules", projectId],
-    queryFn: () => listAlertRules(projectId!),
+  } = useInfiniteQuery({
+    queryKey: ["alert-rules", projectId, workspaceSlug],
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => listAlertRules(projectId!, pageParam),
+    getNextPageParam: (page) => page.meta.next_cursor ?? undefined,
     enabled: Boolean(projectId),
   });
 
+  const rules = data?.pages.flatMap((page) => page.items) ?? [];
   const isLoading = isProjectLoading || (Boolean(projectId) && isRulesLoading);
-  const loadError = isError
+  const loadError = isError && !data
     ? error instanceof Error
       ? error.message
       : "Failed to load alert rules"
@@ -166,10 +171,10 @@ export default function AlertRulesPage() {
             </div>
             <div>
               <div className="text-lg font-semibold">
-                {isLoading ? "--" : `${rules.length} Configured`}
+                {isLoading ? "--" : `${rules.length} Loaded`}
               </div>
               <div className="text-xs text-muted-foreground">
-                Total telemetry rules
+                Alert rules loaded
               </div>
             </div>
           </div>
@@ -264,11 +269,26 @@ export default function AlertRulesPage() {
         </div>
       ) : (
         /* Populated Rules List */
-        <AlertRulesList
-          rules={rules}
-          onDeleteRule={handleDeleteRule}
-          onToggleRule={handleToggleRule}
-        />
+        <>
+          <AlertRulesList
+            rules={rules}
+            onDeleteRule={handleDeleteRule}
+            onToggleRule={handleToggleRule}
+          />
+          {hasNextPage && (
+            <Button
+              variant="outline"
+              disabled={isFetchingNextPage}
+              onClick={() => void fetchNextPage()}
+            >
+              {isFetchingNextPage
+                ? "Loading rules…"
+                : isFetchNextPageError
+                  ? "Retry loading more rules"
+                  : "Load more rules"}
+            </Button>
+          )}
+        </>
       )}
     </div>
   );

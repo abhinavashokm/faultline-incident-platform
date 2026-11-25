@@ -5,7 +5,7 @@ from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager
 
 from app.delivery.models import Delivery, DeliveryAttempt, NotificationChannel
 
@@ -23,7 +23,13 @@ class DeliveryRepository:
         query = (
             select(Delivery)
             .where(Delivery.status == "pending")
-            .options(selectinload(Delivery.channel))
+            .outerjoin(
+                Delivery.channel.and_(
+                    NotificationChannel.workspace_id == Delivery.workspace_id,
+                    NotificationChannel.project_id == Delivery.project_id,
+                )
+            )
+            .options(contains_eager(Delivery.channel))
             .order_by(Delivery.created_at.asc())
             .limit(limit)
         )

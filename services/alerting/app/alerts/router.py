@@ -1,12 +1,14 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from faultline_auth import Principal, get_principal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.alerts.schemas import (
     AlertResponse,
     AlertRuleCreate,
+    AlertRuleListResponse,
     AlertRuleResponse,
     AlertRuleUpdate,
 )
@@ -18,17 +20,19 @@ router = APIRouter(tags=["alerts"])
 
 @router.get(
     "/projects/{project_id}/alert-rules",
-    response_model=list[AlertRuleResponse],
+    response_model=AlertRuleListResponse,
     summary="List alert rules",
 )
 async def list_alert_rules(
     project_id: UUID,
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
-) -> list[AlertRuleResponse]:
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    cursor: Annotated[str | None, Query()] = None,
+) -> AlertRuleListResponse:
     """List configured alert rules for a project."""
     service = AlertRuleService(session)
-    return await service.list_rules(project_id)
+    return await service.list_rules(principal.workspace_id, project_id, limit, cursor)
 
 
 @router.post(
@@ -46,6 +50,7 @@ async def create_alert_rule(
     """Create a new alert rule."""
     service = AlertRuleService(session)
     return await service.create_rule(
+        workspace_id=principal.workspace_id,
         project_id=project_id,
         rule_in=rule_in,
         created_by=principal.user_id if principal else None,
@@ -67,6 +72,7 @@ async def update_alert_rule(
     """Update an existing alert rule."""
     service = AlertRuleService(session)
     return await service.update_rule(
+        workspace_id=principal.workspace_id,
         project_id=project_id,
         rule_id=rule_id,
         rule_in=rule_in,
@@ -86,7 +92,7 @@ async def delete_alert_rule(
 ) -> None:
     """Delete an alert rule."""
     service = AlertRuleService(session)
-    await service.delete_rule(project_id=project_id, rule_id=rule_id)
+    await service.delete_rule(principal.workspace_id, project_id, rule_id)
 
 
 @router.get(

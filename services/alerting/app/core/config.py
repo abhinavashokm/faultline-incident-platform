@@ -1,4 +1,4 @@
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, AnyHttpUrl, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -90,6 +90,9 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("alerting_log_level", "log_level"),
         description="Logging level",
     )
+
+    control_plane_url: AnyHttpUrl | None = None
+    webhook_encryption_key: SecretStr | None = None
 
     # SMTP Configuration (Mailpit by default in dev)
     smtp_host: str = Field(

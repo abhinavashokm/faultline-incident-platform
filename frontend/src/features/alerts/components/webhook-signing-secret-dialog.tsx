@@ -4,15 +4,13 @@ import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { createWebhookChannelMock } from "../api/alertRulesApi";
 
 type Props = {
   secret: string;
-  request: Awaited<ReturnType<typeof createWebhookChannelMock>>["request"];
   onClose: () => void;
 };
 
-export function WebhookSigningSecretDialog({ secret, request, onClose }: Props) {
+export function WebhookSigningSecretDialog({ secret, onClose }: Props) {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   async function copySecret() {
@@ -48,12 +46,6 @@ export function WebhookSigningSecretDialog({ secret, request, onClose }: Props) 
             {copyStatus === "failed" && (
               <p className="text-xs text-error" role="alert">Copy failed. Select the secret and copy it manually.</p>
             )}
-            <details className="text-sm text-muted-foreground">
-              <summary className="cursor-pointer">Mock request</summary>
-              <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg border border-border bg-muted/50 p-3 text-xs text-foreground">
-                {JSON.stringify(request, null, 2)}
-              </pre>
-            </details>
           </div>
           <div className="flex justify-end border-t border-border bg-muted/30 px-6 py-4">
             <Dialog.Close asChild>

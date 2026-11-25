@@ -345,7 +345,7 @@ export function CreateAlertRuleForm({ projectId, channels }: CreateAlertRuleForm
       </div>
 
       {/* Action Footer */}
-      <div className="flex items-center justify-end gap-3 pt-2">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
         <Button
           type="button"
           variant="outline"
@@ -364,17 +364,18 @@ export function CreateAlertRuleForm({ projectId, channels }: CreateAlertRuleForm
         <Button
           type="submit"
           disabled={isSubmitDisabled}
-          className="gap-2 min-w-[140px]"
+          className="min-w-36 gap-2"
+          aria-busy={isSubmitting}
         >
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Saving...</span>
+              <span>Saving…</span>
             </>
           ) : (
             <>
               <Check className="h-4 w-4" />
-              <span>Save Alert Rule</span>
+              <span>Save alert rule</span>
             </>
           )}
         </Button>

@@ -1,6 +1,9 @@
+import base64
+import json
 import logging
 import uuid
-from collections.abc import Sequence
+from binascii import Error as Base64Error
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,12 +13,31 @@ from app.alerts.repository import AlertRuleRepository
 from app.alerts.schemas import (
     AlertRuleChannelResponse,
     AlertRuleCreate,
+    AlertRuleListResponse,
+    AlertRulePaginationMeta,
     AlertRuleResponse,
     AlertRuleUpdate,
 )
 from app.core.uuid7 import uuid7
 
 logger = logging.getLogger(__name__)
+
+
+def encode_rule_cursor(rule: AlertRule) -> str:
+    data = {"created_at": rule.created_at.isoformat(), "id": str(rule.id)}
+    return base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip("=")
+
+
+def decode_rule_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        data = json.loads(base64.b64decode(padded, altchars=b"-_", validate=True))
+        created_at = datetime.fromisoformat(data["created_at"])
+        if created_at.tzinfo is not None:
+            raise ValueError("Expected a timezone-less timestamp")
+        return created_at, uuid.UUID(data["id"])
+    except (Base64Error, KeyError, TypeError, ValueError, AttributeError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid cursor") from exc
 
 
 def map_rule_to_response(rule: AlertRule) -> AlertRuleResponse:
@@ -58,16 +80,33 @@ class AlertRuleService:
         self.session = session
         self.repository = AlertRuleRepository(session)
 
-    async def list_rules(self, project_id: uuid.UUID) -> list[AlertRuleResponse]:
-        rules = await self.repository.list_by_project(project_id)
-        return [map_rule_to_response(r) for r in rules]
+    async def list_rules(
+        self,
+        workspace_id: uuid.UUID,
+        project_id: uuid.UUID,
+        limit: int,
+        cursor: str | None,
+    ) -> AlertRuleListResponse:
+        position = decode_rule_cursor(cursor) if cursor is not None else None
+        rules = await self.repository.list_by_project(workspace_id, project_id, limit, position)
+        page = rules[:limit]
+        has_more = len(rules) > limit
+        return AlertRuleListResponse(
+            items=[map_rule_to_response(rule) for rule in page],
+            meta=AlertRulePaginationMeta(
+                limit=limit,
+                has_more=has_more,
+                next_cursor=encode_rule_cursor(page[-1]) if has_more else None,
+            ),
+        )
 
     async def get_rule(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         rule_id: uuid.UUID,
     ) -> AlertRuleResponse:
-        rule = await self.repository.get_by_id(project_id, rule_id)
+        rule = await self.repository.get_by_id(workspace_id, project_id, rule_id)
         if not rule:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -77,6 +116,7 @@ class AlertRuleService:
 
     async def create_rule(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         rule_in: AlertRuleCreate,
         created_by: uuid.UUID | None = None,
@@ -84,6 +124,7 @@ class AlertRuleService:
         rule_id = uuid7()
         rule = AlertRule(
             id=rule_id,
+            workspace_id=workspace_id,
             project_id=project_id,
             name=rule_in.name,
             rule_type=rule_in.rule_type,
@@ -98,14 +139,13 @@ class AlertRuleService:
             created_by=created_by,
         )
 
-        await self.repository.create(rule)
-        if rule_in.channel_ids:
-            await self.repository.set_channels(rule_id, rule_in.channel_ids)
-
-        await self.session.commit()
+        async with self.session.begin():
+            await self.repository.create(rule)
+            if rule_in.channel_ids:
+                await self._set_channels(rule, rule_in.channel_ids)
 
         # Re-fetch with loaded channels
-        fresh_rule = await self.repository.get_by_id(project_id, rule_id)
+        fresh_rule = await self.repository.get_by_id(workspace_id, project_id, rule_id)
         assert fresh_rule is not None
         logger.info(
             "Created alert rule id=%s project_id=%s rule_type=%s",
@@ -117,11 +157,12 @@ class AlertRuleService:
 
     async def update_rule(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         rule_id: uuid.UUID,
         rule_in: AlertRuleUpdate,
     ) -> AlertRuleResponse:
-        rule = await self.repository.get_by_id(project_id, rule_id)
+        rule = await self.repository.get_by_id(workspace_id, project_id, rule_id)
         if not rule:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -131,25 +172,33 @@ class AlertRuleService:
         update_data = rule_in.model_dump(exclude_unset=True)
         channel_ids = update_data.pop("channel_ids", None)
 
+        if channel_ids is not None:
+            await self._set_channels(rule, channel_ids)
+
         for key, value in update_data.items():
             setattr(rule, key, value)
 
-        if channel_ids is not None:
-            await self.repository.set_channels(rule_id, channel_ids)
-
         await self.session.commit()
 
-        fresh_rule = await self.repository.get_by_id(project_id, rule_id)
+        fresh_rule = await self.repository.get_by_id(workspace_id, project_id, rule_id)
         assert fresh_rule is not None
         logger.info("Updated alert rule id=%s project_id=%s", rule_id, project_id)
         return map_rule_to_response(fresh_rule)
 
+    async def _set_channels(self, rule: AlertRule, channel_ids: list[uuid.UUID]) -> None:
+        if not await self.repository.set_channels(rule, channel_ids):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="One or more notification channels are unavailable in this project",
+            )
+
     async def delete_rule(
         self,
+        workspace_id: uuid.UUID,
         project_id: uuid.UUID,
         rule_id: uuid.UUID,
     ) -> None:
-        rule = await self.repository.get_by_id(project_id, rule_id)
+        rule = await self.repository.get_by_id(workspace_id, project_id, rule_id)
         if not rule:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

@@ -3,6 +3,7 @@ import {
   NotificationChannel,
   CreateNotificationChannelPayload,
   AlertRule,
+  AlertRuleListResponse,
   CreateAlertRulePayload,
 } from "../types";
 
@@ -14,6 +15,12 @@ export async function listChannels(
 ): Promise<NotificationChannel[]> {
   return apiClient.get<NotificationChannel[]>(
     `/api/v1/projects/${projectId}/notification-channels`
+  );
+}
+
+export async function testChannel(projectId: string, channelId: string): Promise<void> {
+  return apiClient.post<void>(
+    `/api/v1/projects/${projectId}/notification-channels/${channelId}/test`
   );
 }
 
@@ -30,7 +37,7 @@ export async function createChannel(
   );
 }
 
-export type CreateWebhookChannelMockPayload = {
+export type CreateWebhookChannelPayload = {
   name: string;
   channel_type: "webhook";
   destination: string;
@@ -41,42 +48,45 @@ export type CreateWebhookChannelMockPayload = {
     | { type: "header"; name: string; value: string };
 };
 
-export type MockWebhookChannel = Omit<CreateWebhookChannelMockPayload, "auth"> & {
-  id: string;
-  has_auth: boolean;
+export async function createWebhookChannel(
+  projectId: string,
+  payload: CreateWebhookChannelPayload
+): Promise<NotificationChannel & { signingSecret: string }> {
+  return apiClient.post<NotificationChannel & { signingSecret: string }>(
+    `/api/v1/projects/${projectId}/notification-channels`,
+    payload
+  );
+}
+
+export type UpdateWebhookChannelPayload = Omit<CreateWebhookChannelPayload, "auth"> & {
+  auth?: CreateWebhookChannelPayload["auth"];
 };
 
-// TODO: Replace this mock with the real create call when webhook channels are supported.
-export async function createWebhookChannelMock(payload: CreateWebhookChannelMockPayload) {
-  const { auth, ...channel } = payload;
-  const request = {
-    ...channel,
-    auth: auth && { ...auth, value: "[redacted]" },
-  };
-  console.log("Mock webhook channel request", request);
+export function updateChannel(
+  projectId: string,
+  channelId: string,
+  payload: CreateNotificationChannelPayload | UpdateWebhookChannelPayload,
+): Promise<NotificationChannel> {
+  return apiClient.patch(
+    `/api/v1/projects/${projectId}/notification-channels/${channelId}`,
+    payload,
+  );
+}
 
-  await new Promise<void>((resolve) => setTimeout(resolve, 600));
-
-  const response: MockWebhookChannel & { signing_secret: string } = {
-    ...channel,
-    id: crypto.randomUUID(),
-    has_auth: auth !== null,
-    signing_secret: "whsec_" + Array.from(
-      crypto.getRandomValues(new Uint8Array(16)),
-      (byte) => byte.toString(16).padStart(2, "0"),
-    ).join(""),
-  };
-  return { request, response };
+export function deleteChannel(projectId: string, channelId: string): Promise<void> {
+  return apiClient.delete(`/api/v1/projects/${projectId}/notification-channels/${channelId}`);
 }
 
 /**
  * List alert rules for a project.
  */
 export async function listAlertRules(
-  projectId: string
-): Promise<AlertRule[]> {
-  return apiClient.get<AlertRule[]>(
-    `/api/v1/projects/${projectId}/alert-rules`
+  projectId: string,
+  cursor?: string
+): Promise<AlertRuleListResponse> {
+  const query = cursor ? `?${new URLSearchParams({ cursor })}` : "";
+  return apiClient.get<AlertRuleListResponse>(
+    `/api/v1/projects/${projectId}/alert-rules${query}`
   );
 }
 

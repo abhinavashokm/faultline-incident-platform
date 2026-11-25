@@ -15,25 +15,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CreateWebhookChannelMockPayload } from "../api/alertRulesApi";
+import type { NotificationChannel } from "../types";
+import type { UpdateWebhookChannelPayload } from "../api/alertRulesApi";
 
-const allowHttp = process.env.NODE_ENV === "development";
-const reservedHeaders = /^(?:host$|content-length$|content-type$|authorization$|x-faultline-)/i;
+const reservedHeaders = /^(?:host$|content-length$|content-type$|authorization$|connection$|transfer-encoding$|x-faultline-)/i;
 
 const webhookSchema = z.object({
   name: z.string().trim().min(1, "Channel name is required.").max(150, "Use 150 characters or fewer."),
   url: z.string().trim().min(1, "Webhook URL is required.").url("Enter a valid URL.").pipe(
     z.string().refine((value) => {
-      const { protocol } = new URL(value);
-      return protocol === "https:" || (allowHttp && protocol === "http:");
-    }, allowHttp ? "Use an HTTPS or HTTP URL." : "Use an HTTPS URL."),
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password && !value.includes("#");
+    }, "Use an HTTPS URL without embedded credentials or a fragment."),
   ),
   enabled: z.boolean(),
   auth: z.discriminatedUnion("type", [
     z.object({ type: z.literal("none") }),
+    z.object({ type: z.literal("keep") }),
     z.object({
       type: z.literal("bearer"),
-      value: z.string().refine((value) => value.trim().length > 0, "Token is required."),
+      value: z.string().refine((value) => value.trim().length > 0 && /^[ -~]+$/.test(value), "Enter a token using printable ASCII characters."),
     }),
     z.object({
       type: z.literal("header"),
@@ -41,7 +42,7 @@ const webhookSchema = z.object({
         .min(1, "Header name is required.")
         .regex(/^[A-Za-z0-9-]+$/, "Use only letters, digits, and hyphens.")
         .refine((value) => !reservedHeaders.test(value), "This header name is reserved."),
-      value: z.string().refine((value) => value.trim().length > 0, "Header value is required."),
+      value: z.string().refine((value) => value.trim().length > 0 && /^[ -~]+$/.test(value), "Enter a header value using printable ASCII characters."),
     }),
   ]),
 });
@@ -88,7 +89,8 @@ type WebhookChannelFormProps = {
   formId: string;
   channelName: string;
   onChannelNameChange: (name: string) => void;
-  onSave: (payload: CreateWebhookChannelMockPayload) => Promise<void>;
+  editingChannel?: NotificationChannel;
+  onSave: (payload: UpdateWebhookChannelPayload) => Promise<void>;
 };
 
 export function WebhookChannelForm({
@@ -96,6 +98,7 @@ export function WebhookChannelForm({
   channelName,
   onChannelNameChange,
   onSave,
+  editingChannel,
 }: WebhookChannelFormProps) {
   const {
     control,
@@ -109,7 +112,12 @@ export function WebhookChannelForm({
   } = useForm<WebhookFormData>({
     resolver: zodResolver(webhookSchema),
     mode: "onBlur",
-    defaultValues: { name: channelName, url: "", auth: { type: "none" }, enabled: true },
+    defaultValues: {
+      name: channelName,
+      url: editingChannel?.destination ?? "",
+      auth: { type: editingChannel ? "keep" : "none" },
+      enabled: editingChannel?.enabled ?? true,
+    },
   });
   const { errors, isSubmitting } = formState;
   const authType = watch("auth.type");
@@ -125,7 +133,7 @@ export function WebhookChannelForm({
         channel_type: "webhook",
         destination: url,
         enabled,
-        auth: auth.type === "none" ? null : auth,
+        ...(auth.type === "keep" ? {} : { auth: auth.type === "none" ? null : auth }),
       }))}
     >
       <fieldset disabled={isSubmitting} className="min-w-0 space-y-4">
@@ -179,6 +187,7 @@ export function WebhookChannelForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {editingChannel && <SelectItem value="keep">Keep saved authentication</SelectItem>}
                   <SelectItem value="none">None</SelectItem>
                   <SelectItem value="bearer">Bearer token</SelectItem>
                   <SelectItem value="header">Custom header</SelectItem>
@@ -201,7 +210,7 @@ export function WebhookChannelForm({
             <FieldError id="webhook-header-name-error" message={headerNameError?.message} />
           </div>
         )}
-        {authType !== "none" && (
+        {(authType === "bearer" || authType === "header") && (
           <div key={authType} className="space-y-1.5">
             <Label htmlFor="webhook-auth-value">{authType === "bearer" ? "Token" : "Header value"}</Label>
             <SecretInput
@@ -228,7 +237,9 @@ export function WebhookChannelForm({
         <div className="p-3 rounded-lg bg-muted/50 border border-border flex items-start gap-2.5">
           <Info className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Requests are signed with HMAC-SHA256. A signing secret is generated after you save and shown only once.
+            {editingChannel
+              ? "Choose an authentication option if you change the webhook URL. The signing secret is retained."
+              : "Requests are signed with HMAC-SHA256. A signing secret is generated after you save and shown only once."}
           </p>
         </div>
       </fieldset>

@@ -1,7 +1,8 @@
 import logging
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, Request, Response, status
 from faultline_auth import Principal, get_principal
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,8 @@ from app.delivery.schemas import (
     DeliveryResponse,
     NotificationChannelCreate,
     NotificationChannelResponse,
+    WebhookChannelCreate,
+    WebhookChannelCreated,
 )
 from app.delivery.service import NotificationChannelService
 
@@ -31,19 +34,23 @@ async def list_notification_channels(
 ) -> list[NotificationChannelResponse]:
     """List notification channels for a project ordered by created_at desc."""
     service = NotificationChannelService(session)
-    channels = await service.list_channels(project_id)
+    channels = await service.list_channels(principal.workspace_id, project_id)
     return [NotificationChannelResponse.model_validate(c) for c in channels]
 
 
 @router.post(
     "/projects/{project_id}/notification-channels",
-    response_model=NotificationChannelResponse,
+    response_model=WebhookChannelCreated | NotificationChannelResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create notification channel",
 )
 async def create_notification_channel(
     project_id: UUID,
-    channel_in: NotificationChannelCreate,
+    channel_in: Annotated[
+        NotificationChannelCreate | WebhookChannelCreate, Body(discriminator="channel_type")
+    ],
+    request: Request,
+    response: Response,
     background_tasks: BackgroundTasks,
     principal: Principal = Depends(get_principal),
     session: AsyncSession = Depends(get_session),
@@ -51,12 +58,61 @@ async def create_notification_channel(
 ) -> NotificationChannelResponse:
     """Create a new notification channel for a project."""
     service = NotificationChannelService(session)
+    if isinstance(channel_in, WebhookChannelCreate):
+        response.headers["Cache-Control"] = "no-store"
+        return await service.create_webhook_channel(
+            principal.workspace_id, project_id, channel_in, request.headers.get("Authorization", ""),
+        )
     channel = await service.create_channel(
+        workspace_id=principal.workspace_id,
         project_id=project_id,
         channel_in=channel_in,
         creator_id=principal.user_id,
         background_tasks=background_tasks,
         email_sender=email_sender,
+    )
+    return NotificationChannelResponse.model_validate(channel)
+
+
+@router.post(
+    "/projects/{project_id}/notification-channels/{channel_id}/test",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Send a test notification",
+    responses={
+        404: {"description": "Channel not found"},
+        409: {"description": "Channel type does not support test delivery"},
+        502: {"description": "Test delivery failed"},
+    },
+)
+async def test_notification_channel(
+    project_id: UUID,
+    channel_id: UUID,
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+    email_sender: EmailSender = Depends(get_email_sender),
+) -> Response:
+    await NotificationChannelService(session).test_channel(
+        principal.workspace_id, project_id, channel_id, email_sender
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch(
+    "/projects/{project_id}/notification-channels/{channel_id}",
+    response_model=NotificationChannelResponse,
+    summary="Update notification channel",
+)
+async def update_notification_channel(
+    project_id: UUID,
+    channel_id: UUID,
+    channel_in: Annotated[
+        NotificationChannelCreate | WebhookChannelCreate, Body(discriminator="channel_type")
+    ],
+    principal: Principal = Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+) -> NotificationChannelResponse:
+    channel = await NotificationChannelService(session).update_channel(
+        principal.workspace_id, project_id, channel_id, channel_in
     )
     return NotificationChannelResponse.model_validate(channel)
 
@@ -70,9 +126,12 @@ async def delete_notification_channel(
     project_id: UUID,
     channel_id: UUID,
     principal: Principal = Depends(get_principal),
-) -> None:
-    """Delete a notification channel."""
-    raise NotImplementedError("Channel deletion will be wired in the service implementation")
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    await NotificationChannelService(session).delete_channel(
+        principal.workspace_id, project_id, channel_id
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
