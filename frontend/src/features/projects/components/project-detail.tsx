@@ -79,7 +79,7 @@ export function ProjectDetail({ workspaceSlug, slug }: { workspaceSlug: string; 
               <Link href={`/${workspaceSlug}/${project.slug}/overview`}>Open project</Link>
             </Button>
             <Button asChild variant="secondary">
-              <Link href={`${projectsPath}/${project.slug}/setup`}>SDK setup</Link>
+              <Link href={`${projectsPath}/${project.slug}/sdk-setup`}>SDK setup</Link>
             </Button>
           </div>
         </Card>

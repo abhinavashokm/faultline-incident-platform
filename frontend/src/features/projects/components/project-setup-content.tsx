@@ -1,20 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { type ReactNode, useState } from "react";
 import {
   Copy,
   Check,
   Eye,
   EyeOff,
-  ArrowRight,
   Loader2,
   Terminal,
   KeyRound,
   ExternalLink,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Project } from "@/features/projects/types";
 import { useProjectApiKey, useLiveEventStatus } from "@/features/projects/hooks";
@@ -25,11 +22,11 @@ import {
 
 interface ProjectSetupContentProps {
   project: Project;
-  workspaceSlug: string;
+  actions?: ReactNode;
+  footerActions?: ReactNode;
 }
 
-export function ProjectSetupContent({ project, workspaceSlug }: ProjectSetupContentProps) {
-  const router = useRouter();
+export function ProjectSetupContent({ project, actions, footerActions }: ProjectSetupContentProps) {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [showDsn, setShowDsn] = useState<boolean>(false);
 
@@ -47,10 +44,6 @@ export function ProjectSetupContent({ project, workspaceSlug }: ProjectSetupCont
     setTimeout(() => {
       setCopiedSection((curr) => (curr === section ? null : curr));
     }, 2000);
-  };
-
-  const handleFinish = () => {
-    router.push(`/${workspaceSlug}/overview`);
   };
 
   const maskedDsn = rawDsn
@@ -83,22 +76,7 @@ export function ProjectSetupContent({ project, workspaceSlug }: ProjectSetupCont
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={handleFinish}
-            className="text-body-sm"
-          >
-            Skip for now
-          </Button>
-          <Button
-            onClick={handleFinish}
-            className="gap-2 text-body-sm"
-          >
-            <span>Go to dashboard</span>
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </div>
+        {actions}
       </div>
 
       {/* Live Status Banner */}
@@ -231,13 +209,11 @@ export function ProjectSetupContent({ project, workspaceSlug }: ProjectSetupCont
           ))}
         </div>
 
-        {/* Card Footer Actions */}
-        <div className="mt-8 pt-4 border-t border-border flex items-center justify-end">
-          <Button onClick={handleFinish} className="gap-2">
-            <span>Go to Overview Dashboard</span>
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </div>
+        {footerActions && (
+          <div className="mt-8 flex items-center justify-end border-t border-border pt-4">
+            {footerActions}
+          </div>
+        )}
       </div>
     </div>
   );
