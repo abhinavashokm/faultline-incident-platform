@@ -21,8 +21,6 @@ interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-  badgeVariant?: "default" | "error" | "warning";
 }
 
 interface SidebarProps {
@@ -60,8 +58,6 @@ export function Sidebar({
       name: "Issues",
       href: `${basePrefix}/issues`,
       icon: AlertOctagon,
-      badge: "14",
-      badgeVariant: "warning",
     },
     {
       name: "Performance",
@@ -77,14 +73,11 @@ export function Sidebar({
       name: "Incidents",
       href: `${basePrefix}/incidents`,
       icon: Flame,
-      badge: "2",
-      badgeVariant: "error",
     },
     {
       name: "Investigations",
       href: `${basePrefix}/investigations`,
       icon: SearchCode,
-      badge: "AI",
     },
   ];
 
@@ -119,14 +112,11 @@ export function Sidebar({
             className="flex items-center gap-2.5 overflow-hidden"
           >
             {/* Expanded on mobile and desktop, mark only on tablet */}
-            <div className="hidden lg:block">
+            <div className="md:hidden lg:block">
               <Logo size={24} />
             </div>
-            <div className="block lg:hidden md:block">
+            <div className="hidden md:block lg:hidden">
               <LogoMark size={24} />
-            </div>
-            <div className="block md:hidden">
-              <Logo size={24} />
             </div>
           </Link>
 
@@ -156,11 +146,12 @@ export function Sidebar({
                 href={item.href}
                 onClick={onMobileClose}
                 className={cn(
-                  "group relative flex items-center gap-3 rounded-md px-2.5 py-2 text-body-sm font-medium transition-colors",
+                  "group flex items-center gap-3 rounded-md px-2.5 py-2 text-body-sm font-medium transition-colors md:justify-center md:px-0 lg:justify-start lg:px-2.5",
                   isActive
-                    ? "bg-primary-tint text-primary font-semibold border-l-2 border-primary"
+                    ? "bg-primary-tint text-primary font-semibold"
                     : "text-text-secondary hover:bg-canvas hover:text-text-primary"
                 )}
+                aria-current={isActive ? "page" : undefined}
                 title={item.name}
               >
                 <Icon
@@ -172,22 +163,6 @@ export function Sidebar({
 
                 {/* Text visible in expanded mode (desktop & mobile drawer) */}
                 <span className="truncate md:hidden lg:inline">{item.name}</span>
-
-                {/* Badge if present */}
-                {item.badge && (
-                  <span
-                    className={cn(
-                      "ml-auto font-mono text-[10px] px-1.5 py-0.2 rounded-full font-semibold md:hidden lg:inline-flex",
-                      item.badgeVariant === "error"
-                        ? "bg-error-container text-error"
-                        : item.badgeVariant === "warning"
-                        ? "bg-warning-container text-warning-foreground"
-                        : "bg-ai-container text-ai-foreground"
-                    )}
-                  >
-                    {item.badge}
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -202,9 +177,6 @@ export function Sidebar({
             <div className="min-w-0 flex-1 md:hidden lg:block">
               <div className="text-label-md font-semibold text-text-primary truncate">
                 {workspaceName}
-              </div>
-              <div className="text-[11px] font-mono text-text-muted truncate">
-                cluster: us-east-k8s
               </div>
             </div>
           </div>

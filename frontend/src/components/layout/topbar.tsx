@@ -137,7 +137,7 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/75">
+    <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-border bg-card px-4">
       {/* Left: Mobile trigger & Selectors */}
       <div className="flex items-center gap-3">
         <button
@@ -151,7 +151,7 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
 
         {/* Workspace Switcher */}
         <div className="flex items-center gap-1.5">
-          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-canvas text-label-md font-medium text-text-primary">
+          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 text-body-sm text-text-primary">
             <Building2 className="h-3.5 w-3.5 text-primary" />
             <span className="font-semibold">{workspaceName}</span>
           </div>
@@ -217,8 +217,9 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
           <input
             type="text"
-            placeholder="Search issues, trace IDs, releases, or documentation..."
-            className="w-full h-8 pl-8 pr-12 rounded-md border border-border bg-canvas text-body-sm text-text-primary placeholder:text-text-muted shadow-level-1 focus:border-primary focus:ring-2 focus:ring-primary-subdued focus:outline-none transition-all"
+            aria-label="Search"
+            placeholder="Search issues, traces, and releases"
+            className="w-full h-8 pl-8 pr-12 rounded-md border border-border bg-canvas text-body-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary-subdued focus:outline-none transition-all"
           />
           <kbd className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none inline-flex h-5 select-none items-center gap-0.5 rounded border border-border bg-card px-1.5 font-mono text-[10px] font-medium text-text-muted shadow-level-1">
             ⌘K

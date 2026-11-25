@@ -10,14 +10,14 @@
     --border: #E2E8F0;
     --border-hover: #CBD5E1;
 
-    --primary: #3B82F6;
+    --primary: #2563EB;
     --primary-hover: #1D4ED8;
     --primary-tint: #EFF6FF;
     --primary-subdued: #DBEAFE;
     --primary-foreground: #FFFFFF;
 
     --error: #EF4444;
-    --error-foreground: #EF4444;
+    --error-foreground: #B91C1C;
     --error-container: #FEE2E2;
 
     --destructive: #EF4444;
@@ -33,7 +33,7 @@
     --success-container: #D1FAE5;
 
     --info: #06B6D4;
-    --info-foreground: #06B6D4;
+    --info-foreground: #155E75;
     --info-container: #CFFAFE;
 
     --ai: #8B5CF6;
@@ -42,7 +42,7 @@
 
     --text-primary: #0F172A;
     --text-secondary: #475569;
-    --text-muted: #94A3B8;
+    --text-muted: #64748B;
 
     --muted: #F1F5F9;
     --ring: #3B82F6;
@@ -87,7 +87,7 @@
 
     --text-primary: #F8FAFC;
     --text-secondary: #94A3B8;
-    --text-muted: #64748B;
+    --text-muted: #94A3B8;
 
     --muted: #1E293B;
     --ring: #3B82F6;
@@ -99,6 +99,11 @@
 
   * {
     border-color: var(--border);
+  }
+
+  :where(a, button):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 
   body {

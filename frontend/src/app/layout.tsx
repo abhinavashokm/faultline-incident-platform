@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { Rubik, Roboto_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/lib/query-provider";
 import { AuthProvider } from "@/features/auth/auth-context";
 import { GlobalLoadingProvider } from "@/components/layout/global-loading-provider";
 import { Toaster } from "@/components/ui/toaster";
 
-const rubik = Rubik({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
 });
 
-const robotoMono = Roboto_Mono({
+const jetBrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
   display: "swap",
@@ -32,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${rubik.variable} ${robotoMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${jetBrainsMono.variable}`}>
       <body className="min-h-screen bg-canvas font-sans text-text-primary antialiased">
         <QueryProvider>
           <AuthProvider>
