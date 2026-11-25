@@ -1,19 +1,27 @@
+import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
 const columns = ["Incident", "Severity", "Status", "Assignee", "Started"];
 
-export default function IncidentsPage() {
+export default function IncidentsPage({
+  params,
+}: {
+  params: { workspaceSlug: string; projectSlug: string };
+}) {
+  const createHref = `/${params.workspaceSlug}/${params.projectSlug}/incidents/new`;
   return (
     <div className="flex-1 space-y-6 p-6">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b pb-5">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Incidents
         </h1>
-        <Button type="button" className="gap-2" disabled>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Create incident
+        <Button className="gap-2" asChild>
+          <Link href={createHref}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Create incident
+          </Link>
         </Button>
       </header>
 
