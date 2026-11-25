@@ -3,11 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listProjectsApi,
   createProjectApi,
+  updateProjectApi,
   getProjectApiKeyApi,
   checkFirstEventStatusApi,
 } from "./api";
 import { CreateProjectFormData } from "./schemas";
-import { Project, ProjectApiKeyResponse } from "./types";
+import { Project, ProjectApiKeyResponse, ProjectUpdate } from "./types";
 import { useAuth } from "@/features/auth/auth-context";
 
 export function useListProjects() {
@@ -71,6 +72,8 @@ export function useCreateProject() {
         return [...old, newProject];
       });
 
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+
       // 2. If the response contains the dsn, pre-seed ["project-api-key", newProject.id]
       if (newProject.dsn && newProject.id) {
         queryClient.setQueryData<ProjectApiKeyResponse>(["project-api-key", newProject.id], {
@@ -81,6 +84,22 @@ export function useCreateProject() {
           created_at: newProject.created_at || newProject.createdAt || new Date().toISOString(),
         });
       }
+    },
+  });
+}
+
+export function useUpdateProject(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: ProjectUpdate) => updateProjectApi(projectId, data),
+    onSuccess: (updatedProject) => {
+      queryClient.setQueryData<Project[]>(["projects"], (projects) =>
+        projects?.map((project) =>
+          project.id === updatedProject.id ? updatedProject : project
+        )
+      );
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }

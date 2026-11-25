@@ -19,3 +19,10 @@ export const createProjectSchema = z.object({
 });
 
 export type CreateProjectFormData = z.infer<typeof createProjectSchema>;
+
+export const editProjectSchema = z.object({
+  name: z.string().trim().min(1, "Enter a project name").max(150, "Use 150 characters or fewer"),
+  description: z.string(),
+});
+
+export type EditProjectFormData = z.infer<typeof editProjectSchema>;

@@ -14,6 +14,11 @@ export interface Project {
   eventCount?: number;
 }
 
+export interface ProjectUpdate {
+  name?: string;
+  description?: string | null;
+}
+
 export interface ProjectApiKeyResponse {
   id: string;
   key_type: "ingest" | "release";

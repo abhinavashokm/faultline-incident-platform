@@ -1,6 +1,6 @@
 import { apiClient, delay } from "@/lib/api-client";
 import { CreateProjectFormData } from "./schemas";
-import { Project, ProjectApiKeyResponse, LiveStatusEvent } from "./types";
+import { Project, ProjectApiKeyResponse, LiveStatusEvent, ProjectUpdate } from "./types";
 
 export async function listProjectsApi(): Promise<Project[]> {
   return apiClient.get<Project[]>("/api/v1/projects");
@@ -23,6 +23,10 @@ export async function createProjectApi(data: CreateProjectFormData): Promise<Pro
   }
 
   return apiClient.post<Project>("/api/v1/projects", payload);
+}
+
+export async function updateProjectApi(projectId: string, data: ProjectUpdate): Promise<Project> {
+  return apiClient.patch<Project>(`/api/v1/projects/${projectId}`, data);
 }
 
 export async function getProjectApiKeyApi(projectId: string): Promise<ProjectApiKeyResponse> {

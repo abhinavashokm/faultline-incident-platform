@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { ProjectFlowHeader } from "@/components/layout/project-flow-header";
-import { useCurrentWorkspace } from "@/features/workspace/hooks";
+import { useCurrentUser } from "@/features/auth/hooks";
 import { useListProjects } from "@/features/projects/hooks";
 
 export default function DashboardLayout({
@@ -20,18 +20,19 @@ export default function DashboardLayout({
   const workspaceSlug = (params.workspaceSlug as string) || "";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const { data: workspace } = useCurrentWorkspace();
-  const workspaceName = workspace?.name ?? workspaceSlug;
+  const { data: currentUser } = useCurrentUser();
+  const workspaceName = currentUser?.workspace?.name ?? workspaceSlug;
 
   const { data: projects, isLoading: projectsLoading } = useListProjects();
 
+  const isProjectsList = pathname === `/${workspaceSlug}/projects`;
   const isProjectsNew = pathname.endsWith("/projects/new");
   const isProjectsSetup = pathname.includes("/projects/") && pathname.endsWith("/setup");
-  const isFocusedFlow = isProjectsNew || isProjectsSetup;
+  const isFocusedFlow = isProjectsList || isProjectsNew || isProjectsSetup;
 
   // If the workspace has no projects, redirect to the new project creation page.
   // Use router.replace so the previous dashboard URL is not left in history.
-  // Avoid redirecting if the user is already on /projects/new or /projects/{slug}/setup.
+  // Avoid redirecting if the user is already in the project shell.
   useEffect(() => {
     if (!projectsLoading && projects && projects.length === 0 && !isFocusedFlow) {
       router.replace(`/${workspaceSlug}/projects/new`);
@@ -39,7 +40,7 @@ export default function DashboardLayout({
   }, [projectsLoading, projects, isFocusedFlow, workspaceSlug, router]);
 
   // Show a full-page spinner while loading or while the zero-projects redirect is pending
-  if (projectsLoading || (!isFocusedFlow && projects && projects.length === 0)) {
+  if (!isProjectsList && (projectsLoading || (!isFocusedFlow && projects && projects.length === 0))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-canvas">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -47,9 +48,9 @@ export default function DashboardLayout({
     );
   }
 
-  // Focused full-width layout for /projects/new and /projects/{slug}/setup
+  // Shared shell for project management, creation, and setup
   if (isFocusedFlow) {
-    const currentStep = isProjectsNew ? 1 : 2;
+    const currentStep = isProjectsNew ? 1 : isProjectsSetup ? 2 : undefined;
     return (
       <div className="min-h-screen bg-canvas text-text-primary flex flex-col justify-between">
         <ProjectFlowHeader
