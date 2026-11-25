@@ -29,6 +29,10 @@ export async function updateProjectApi(projectId: string, data: ProjectUpdate): 
   return apiClient.patch<Project>(`/api/v1/projects/${projectId}`, data);
 }
 
+export async function deleteProjectApi(projectId: string): Promise<void> {
+  await apiClient.delete(`/api/v1/projects/${projectId}`);
+}
+
 export async function getProjectApiKeyApi(projectId: string): Promise<ProjectApiKeyResponse> {
   return apiClient.get<ProjectApiKeyResponse>(`/api/v1/projects/${projectId}/api-key`);
 }

@@ -4,6 +4,7 @@ import {
   listProjectsApi,
   createProjectApi,
   updateProjectApi,
+  deleteProjectApi,
   getProjectApiKeyApi,
   checkFirstEventStatusApi,
 } from "./api";
@@ -99,6 +100,22 @@ export function useUpdateProject(projectId: string) {
           project.id === updatedProject.id ? updatedProject : project
         )
       );
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteProjectApi,
+    onSuccess: async (_, projectId) => {
+      await queryClient.cancelQueries({ queryKey: ["projects"] });
+      queryClient.setQueryData<Project[]>(["projects"], (projects) =>
+        projects?.filter((project) => project.id !== projectId)
+      );
+      queryClient.removeQueries({ queryKey: ["project-api-key", projectId] });
       void queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
