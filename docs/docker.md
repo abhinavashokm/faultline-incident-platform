@@ -96,7 +96,7 @@ Services are grouped by profile so you can start only what you need:
 | Profile | Services started |
 |---|---|
 | *(none)* | postgres, kafka, mailpit, redis (infra always) |
-| `backend` | + migrate, gateway, control-plane, ingestion, Processing API and workers, Alerting API and workers |
+| `backend` | + migrate, gateway, control-plane, ingestion, Processing API and workers, Alerting API and workers, Incident API |
 | `frontend` | + frontend |
 
 The root `.env` sets `COMPOSE_PROFILES=backend,frontend` by default, so `docker compose up -d` starts everything.
@@ -116,7 +116,7 @@ COMPOSE_PROFILES=backend,frontend docker compose up -d
 
 ## Startup Order
 
-Compose waits for PostgreSQL before running the migration job for Control Plane, Processing, and Alerting. Kafka initialization creates the topics used by the workers. The gateway waits for its upstream services to become healthy. Use `make ps` and `make logs` to diagnose startup failures.
+Compose waits for PostgreSQL before running the migration job for Control Plane, Processing, Alerting, and Incident. Kafka initialization creates the topics used by the workers. The gateway waits for its upstream services to become healthy. Use `make ps` and `make logs` to diagnose startup failures.
 
 ---
 
@@ -146,7 +146,7 @@ The frontend runs `npm run dev` (Next.js dev server) with `WATCHPACK_POLLING=tru
 
 ## Running Migrations Manually
 
-Migrations for Control Plane, Processing, and Alerting run automatically in the `migrate` container at startup. To run them again manually:
+Migrations for Control Plane, Processing, Alerting, and Incident run automatically in the `migrate` container at startup. To run them again manually:
 
 ```bash
 make migrate

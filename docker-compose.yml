@@ -108,6 +108,7 @@ services:
       CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/control_plane
       PROCESSING_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/processing
       ALERTING_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/alerting
+      INCIDENT_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/incident
       # Required field – placeholder is fine for migrate-only container
       CONTROL_PLANE_INTERNAL_SERVICE_SECRET: placeholder-migrate-only
     restart: "no"
@@ -381,8 +382,8 @@ services:
       AUTH_ISSUER: faultline-control-plane
       AUTH_AUDIENCE: faultline
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       control-plane:
         condition: service_healthy
       processing-api:

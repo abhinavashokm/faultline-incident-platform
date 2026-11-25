@@ -20,13 +20,16 @@ Set these variables in the environment or local `.env` file.
 - Use the shared auth settings `AUTH_PROVIDER`, `AUTH_JWKS_URL` (for JWKS),
   `AUTH_ISSUER`, and `AUTH_AUDIENCE`.
 
-Before sending creation requests, provision the `incidents` schema and apply
-an Incident-owned migration for `incidents`, `incident_issues`, and
-`incident_timeline` using the approved DBML. The incident table requires
-`project_id` and an index on `(workspace_id, project_id, created_at)`. For an
-existing incident table, backfill project IDs before enforcing `NOT NULL`.
-Once the Incident Alembic configuration and migration are in place, run
-`alembic upgrade head` from the Incident service directory.
+The Compose migration job creates the Incident schema and tables before the
+service starts. To rebuild and run the job against an existing Compose stack:
+
+```sh
+docker compose --profile backend run --rm --build migrate
+```
+
+For standalone development, create the Incident database first and run
+`alembic -c services/incident/alembic.ini upgrade head` using the service
+virtual environment and `INCIDENT_DATABASE_URL`.
 
 ## Run locally
 
