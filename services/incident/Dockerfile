@@ -4,8 +4,9 @@ FROM python:3.12-slim AS builder
 ENV PIP_NO_CACHE_DIR=1
 
 RUN python -m venv /opt/venv
+COPY libs/faultline-auth /build/libs/faultline-auth
 COPY services/incident /build/service
-RUN /opt/venv/bin/pip install /build/service
+RUN /opt/venv/bin/pip install /build/libs/faultline-auth /build/service
 
 FROM python:3.12-slim
 
