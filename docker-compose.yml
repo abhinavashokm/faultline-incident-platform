@@ -373,6 +373,10 @@ services:
     build:
       context: .
       dockerfile: services/incident/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./services/incident/app:/app/app:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8004", "--reload"]
     environment:
       INCIDENT_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/incident
       INCIDENT_CONTROL_PLANE_URL: http://control-plane:8000
