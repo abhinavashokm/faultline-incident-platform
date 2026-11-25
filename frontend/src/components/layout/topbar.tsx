@@ -134,6 +134,7 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
 
   const onManageProjects = () => {
     setProjectSelectOpen(false);
+    router.push(`/${workspaceSlug}/projects`);
   };
 
   return (
@@ -284,7 +285,7 @@ export function Topbar({ workspaceSlug, workspaceName, onMobileMenuToggle }: Top
 
               <div className="py-1">
                 <Link
-                  href="/projects"
+                  href={`/${workspaceSlug}/projects`}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded text-body-sm text-text-secondary hover:bg-canvas hover:text-text-primary"
                 >
                   <FolderKanban className="h-4 w-4 text-text-muted" />

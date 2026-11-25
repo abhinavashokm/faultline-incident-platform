@@ -3,11 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listProjectsApi,
   createProjectApi,
+  updateProjectApi,
+  deleteProjectApi,
   getProjectApiKeyApi,
+  rotateProjectApiKeyApi,
   checkFirstEventStatusApi,
 } from "./api";
 import { CreateProjectFormData } from "./schemas";
-import { Project, ProjectApiKeyResponse } from "./types";
+import { Project, ProjectApiKeyResponse, ProjectUpdate } from "./types";
 import { useAuth } from "@/features/auth/auth-context";
 
 export function useListProjects() {
@@ -56,6 +59,26 @@ export function useProjectApiKey(projectId?: string) {
   });
 }
 
+export function useRotateProjectApiKey(projectId: string) {
+  const queryClient = useQueryClient();
+  const keyQuery = ["project-api-key", projectId];
+
+  return useMutation({
+    mutationFn: () => rotateProjectApiKeyApi(projectId),
+    retry: false,
+    onSuccess: async (newKey) => {
+      await queryClient.cancelQueries({ queryKey: keyQuery, exact: true });
+      if (!queryClient.getQueryState(keyQuery)) return;
+      queryClient.setQueryData(keyQuery, newKey);
+      queryClient.setQueryData<Project[]>(["projects"], (projects) =>
+        projects?.map((project) =>
+          project.id === projectId && project.dsn ? { ...project, dsn: newKey.dsn } : project
+        )
+      );
+    },
+  });
+}
+
 export function useCreateProject() {
   const queryClient = useQueryClient();
 
@@ -71,6 +94,8 @@ export function useCreateProject() {
         return [...old, newProject];
       });
 
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+
       // 2. If the response contains the dsn, pre-seed ["project-api-key", newProject.id]
       if (newProject.dsn && newProject.id) {
         queryClient.setQueryData<ProjectApiKeyResponse>(["project-api-key", newProject.id], {
@@ -81,6 +106,38 @@ export function useCreateProject() {
           created_at: newProject.created_at || newProject.createdAt || new Date().toISOString(),
         });
       }
+    },
+  });
+}
+
+export function useUpdateProject(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: ProjectUpdate) => updateProjectApi(projectId, data),
+    onSuccess: (updatedProject) => {
+      queryClient.setQueryData<Project[]>(["projects"], (projects) =>
+        projects?.map((project) =>
+          project.id === updatedProject.id ? updatedProject : project
+        )
+      );
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+}
+
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteProjectApi,
+    onSuccess: async (_, projectId) => {
+      await queryClient.cancelQueries({ queryKey: ["projects"] });
+      queryClient.setQueryData<Project[]>(["projects"], (projects) =>
+        projects?.filter((project) => project.id !== projectId)
+      );
+      queryClient.removeQueries({ queryKey: ["project-api-key", projectId] });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 }

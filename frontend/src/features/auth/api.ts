@@ -56,7 +56,7 @@ export async function resendOtpApi(
 }
 
 export async function fetchCurrentUserApi(): Promise<CurrentUserResponse> {
-  return await apiClient.get<CurrentUserResponse>("/api/v1/auth/me");
+  return apiClient.get<CurrentUserResponse>("/api/v1/auth/me", { transformCase: false });
 }
 
 export async function logoutApi(): Promise<void> {

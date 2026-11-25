@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   clearAccessToken,
@@ -50,6 +51,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isReady, setIsReady] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -62,9 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       clearAccessToken();
       setIsAuthenticated(false);
+      queryClient.clear();
       router.push("/login");
     }
-  }, [router]);
+  }, [queryClient, router]);
 
   // Register the failure handler on the api-client so the 401 interceptor can
   // trigger a redirect without importing the router itself.
