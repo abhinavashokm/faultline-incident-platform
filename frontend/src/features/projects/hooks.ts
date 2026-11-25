@@ -6,6 +6,7 @@ import {
   updateProjectApi,
   deleteProjectApi,
   getProjectApiKeyApi,
+  rotateProjectApiKeyApi,
   checkFirstEventStatusApi,
 } from "./api";
 import { CreateProjectFormData } from "./schemas";
@@ -55,6 +56,26 @@ export function useProjectApiKey(projectId?: string) {
     queryFn: () => getProjectApiKeyApi(projectId!),
     enabled: Boolean(projectId),
     staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useRotateProjectApiKey(projectId: string) {
+  const queryClient = useQueryClient();
+  const keyQuery = ["project-api-key", projectId];
+
+  return useMutation({
+    mutationFn: () => rotateProjectApiKeyApi(projectId),
+    retry: false,
+    onSuccess: async (newKey) => {
+      await queryClient.cancelQueries({ queryKey: keyQuery, exact: true });
+      if (!queryClient.getQueryState(keyQuery)) return;
+      queryClient.setQueryData(keyQuery, newKey);
+      queryClient.setQueryData<Project[]>(["projects"], (projects) =>
+        projects?.map((project) =>
+          project.id === projectId && project.dsn ? { ...project, dsn: newKey.dsn } : project
+        )
+      );
+    },
   });
 }
 

@@ -5,14 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
+import { useCurrentUser } from "@/features/auth/hooks";
+import { ProjectDsn } from "./project-dsn";
 import { useListProjects } from "../hooks";
 import { PLATFORM_REGISTRY } from "../platform-registry";
 
 export function ProjectDetail({ workspaceSlug, slug }: { workspaceSlug: string; slug: string }) {
   const { isReady, isAuthenticated } = useAuth();
+  const { data: currentUser } = useCurrentUser();
   const { data: projects, isPending, isError, isFetching, refetch } = useListProjects();
   const project = projects?.find((item) => item.slug === slug);
   const projectsPath = `/${workspaceSlug}/projects`;
+  const role = currentUser?.memberships?.find(
+    (membership) => membership.workspace_id === currentUser.workspace?.id
+  )?.role;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -74,6 +80,7 @@ export function ProjectDetail({ workspaceSlug, slug }: { workspaceSlug: string; 
               </dd>
             </div>
           </dl>
+          <ProjectDsn key={project.id} projectId={project.id} canRotate={role === "owner" || role === "admin"} />
           <div className="flex flex-wrap gap-2 border-t border-border px-6 py-4">
             <Button asChild>
               <Link href={`/${workspaceSlug}/${project.slug}/overview`}>Open project</Link>

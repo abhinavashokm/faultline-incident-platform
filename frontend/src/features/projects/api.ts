@@ -37,6 +37,10 @@ export async function getProjectApiKeyApi(projectId: string): Promise<ProjectApi
   return apiClient.get<ProjectApiKeyResponse>(`/api/v1/projects/${projectId}/api-key`);
 }
 
+export async function rotateProjectApiKeyApi(projectId: string): Promise<ProjectApiKeyResponse> {
+  return apiClient.post<ProjectApiKeyResponse>(`/api/v1/projects/${projectId}/api-key/rotate`);
+}
+
 export async function checkFirstEventStatusApi(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _projectId?: string
