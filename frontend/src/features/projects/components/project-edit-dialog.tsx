@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
@@ -57,19 +57,22 @@ export function ProjectEditDialog({ project }: { project: Project }) {
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Trigger asChild>
-        <Button type="button" size="sm" variant="secondary" aria-label={`Edit ${project.name}`}>
+        <Button type="button" size="sm" variant="ghost" className="-mr-2 gap-1.5" aria-label={`Edit ${project.name}`}>
+          <Pencil aria-hidden="true" className="h-4 w-4" />
           Edit
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-level-3">
-          <Dialog.Title className="text-headline-sm font-semibold">Edit project</Dialog.Title>
-          <Dialog.Description className="mt-1 break-words font-mono text-label-sm text-text-muted">
-            {project.slug}
-          </Dialog.Description>
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-card shadow-level-3">
+          <div className="border-b border-border px-6 py-4">
+            <Dialog.Title className="text-headline-sm font-semibold">Edit project</Dialog.Title>
+            <Dialog.Description className="mt-1 break-words font-mono text-label-sm text-text-muted">
+              {project.slug}
+            </Dialog.Description>
+          </div>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="mt-5 space-y-4">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 p-6">
               <AuthErrorAlert error={update.error?.message} />
               <FormField
                 control={form.control}
@@ -93,7 +96,7 @@ export function ProjectEditDialog({ project }: { project: Project }) {
                     <FormControl>
                       <textarea
                         {...field}
-                        className="block w-full rounded-md border border-border bg-card px-3 py-2 text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="block w-full rounded-md border border-border bg-card px-3 py-2 text-body-sm text-text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         rows={4}
                         disabled={update.isPending}
                       />
@@ -102,7 +105,7 @@ export function ProjectEditDialog({ project }: { project: Project }) {
                   </FormItem>
                 )}
               />
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 border-t border-border pt-4">
                 <Dialog.Close asChild>
                   <Button type="button" variant="secondary" disabled={update.isPending}>Cancel</Button>
                 </Dialog.Close>

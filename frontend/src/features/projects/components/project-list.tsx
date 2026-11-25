@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, FolderOpen, Plus } from "lucide-react";
+import { ArrowRight, FolderOpen, Plus, Zap } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,8 +24,8 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
 
   return (
     <section aria-labelledby="projects-heading">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 id="projects-heading" className="text-headline-md font-semibold">Projects</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
+        <h1 id="projects-heading" className="text-headline-md font-semibold tracking-tight">Projects</h1>
         {isAuthenticated && canManageProjects && (
           <Button asChild>
             <Link href={`${workspacePath}/projects/new`}>
@@ -39,7 +40,7 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
         <div role="status" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <span className="sr-only">Loading projects…</span>
           {[0, 1, 2].map((index) => (
-            <Skeleton key={index} aria-hidden="true" className="h-44" />
+            <Skeleton key={index} aria-hidden="true" className="h-44 rounded-lg" />
           ))}
         </div>
       ) : !isAuthenticated ? (
@@ -54,7 +55,7 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
           </Button>
         </Card>
       ) : !projects?.length ? (
-        <Card className="p-10 text-center">
+        <Card className="border-dashed p-10 text-center">
           <FolderOpen aria-hidden="true" className="mx-auto mb-3 h-6 w-6 text-text-muted" />
           <h2 className="text-headline-sm font-semibold">No projects yet</h2>
         </Card>
@@ -62,29 +63,42 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <li key={project.id} className="min-w-0">
-              <Card className="flex h-full flex-col">
+              <Card className="flex h-full flex-col transition-colors focus-within:border-border-hover hover:border-border-hover">
                 <div className="flex-1 p-5">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div className="rounded-md border border-border bg-canvas p-2 text-primary">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 rounded-md bg-primary-tint p-2 text-primary">
                       <FolderOpen aria-hidden="true" className="h-5 w-5" />
                     </div>
-                    {project.platform && (
-                      <span className="text-label-sm text-text-secondary">
+                    <div className="min-w-0">
+                      <h2 className="break-words text-body-md font-semibold">{project.name}</h2>
+                      <p className="mt-0.5 break-words font-mono text-label-sm text-text-muted">
+                        {project.slug}
+                      </p>
+                    </div>
+                  </div>
+                  {project.description && (
+                    <p className="mt-4 break-words text-body-sm text-text-secondary">{project.description}</p>
+                  )}
+                  {project.platform && (
+                    <Badge
+                      variant={project.platform === "fastapi" ? "success" : "default"}
+                      showDot={false}
+                      className="mt-3 max-w-full break-all font-sans normal-case tracking-normal"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {project.platform === "fastapi" && (
+                          <Zap aria-hidden="true" className="h-3 w-3 shrink-0" />
+                        )}
                         {PLATFORM_REGISTRY[project.platform]?.label ?? project.platform}
                       </span>
-                    )}
-                  </div>
-                  <h2 className="break-words text-headline-sm font-semibold">{project.name}</h2>
-                  <p className="mt-1 break-words font-mono text-label-sm text-text-muted">{project.slug}</p>
-                  {project.description && (
-                    <p className="mt-3 break-words text-body-sm text-text-secondary">{project.description}</p>
+                    </Badge>
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-3">
-                  <Button asChild variant="link">
+                <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-2">
+                  <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1.5">
                     <Link href={`${workspacePath}/${project.slug}/overview`} aria-label={`Open ${project.name}`}>
                       Open project
-                      <ArrowUpRight aria-hidden="true" className="ml-1 h-4 w-4" />
+                      <ArrowRight aria-hidden="true" className="h-4 w-4" />
                     </Link>
                   </Button>
                   {canManageProjects && <ProjectEditDialog project={project} />}
