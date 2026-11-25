@@ -70,31 +70,32 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <li key={project.id} className="min-w-0">
-              <Card className="relative isolate flex h-full flex-col transition-colors focus-within:border-border-hover hover:border-border-hover">
-                <div className="flex-1 p-5">
-                  <div className="flex items-start gap-3">
-                    <div className="shrink-0 rounded-md bg-primary-tint p-2 text-primary">
-                      <FolderOpen aria-hidden="true" className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="break-words text-body-md font-semibold">
-                        <Link
-                          href={`${workspacePath}/projects/${project.slug}`}
-                          className="outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-primary"
-                        >
-                          {project.name}
-                        </Link>
-                      </h2>
-                      <p className="mt-0.5 break-words font-mono text-label-sm text-text-muted">
-                        {project.slug}
-                      </p>
-                    </div>
-                    {canManageProjects && (
+              <Card className="relative isolate h-full p-5 transition-colors focus-within:border-border-hover hover:border-border-hover">
+                <div className="flex items-start gap-3">
+                  <div className="shrink-0 rounded-md bg-primary-tint p-2 text-primary">
+                    <FolderOpen aria-hidden="true" className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="break-words text-body-md font-semibold">
+                      <Link
+                        href={`${workspacePath}/projects/${project.slug}`}
+                        className="outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-primary"
+                      >
+                        {project.name}
+                      </Link>
+                    </h2>
+                    <p className="mt-0.5 break-words font-mono text-label-sm text-text-muted">
+                      {project.slug}
+                    </p>
+                  </div>
+                  {canManageProjects && (
+                    <div className="relative z-10 -mr-1 flex shrink-0 items-center">
+                      <ProjectEditDialog project={project} />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="relative z-10 -mr-2 ml-auto shrink-0 hover:bg-error-container hover:text-error"
+                        className="hover:bg-error-container hover:text-error"
                         aria-label={`Delete ${project.name}`}
                         title="Delete project"
                         onClick={() => {
@@ -104,29 +105,22 @@ export function ProjectList({ workspaceSlug }: { workspaceSlug: string }) {
                       >
                         <Trash2 aria-hidden="true" className="h-4 w-4" />
                       </Button>
-                    )}
-                  </div>
-                  {project.platform && (
-                    <Badge
-                      variant={project.platform === "fastapi" ? "success" : "default"}
-                      showDot={false}
-                      className={`mt-3 max-w-full break-all font-sans normal-case tracking-normal${project.platform === "fastapi" ? " px-1.5 py-0" : ""}`}
-                    >
-                      <span className={project.platform === "fastapi" ? "text-[0.9em]" : undefined}>
-                        {PLATFORM_REGISTRY[project.platform]?.label ?? project.platform}
-                      </span>
-                    </Badge>
-                  )}
-                  {project.description && (
-                    <p className="mt-4 break-words text-body-sm text-text-secondary">{project.description}</p>
+                    </div>
                   )}
                 </div>
-                {canManageProjects && (
-                  <div className="flex justify-end border-t border-border px-5 py-2">
-                    <div className="relative z-10">
-                      <ProjectEditDialog project={project} />
-                    </div>
-                  </div>
+                {project.platform && (
+                  <Badge
+                    variant={project.platform === "fastapi" ? "success" : "default"}
+                    showDot={false}
+                    className={`mt-3 max-w-full break-all font-sans normal-case tracking-normal${project.platform === "fastapi" ? " px-1.5 py-0" : ""}`}
+                  >
+                    <span className={project.platform === "fastapi" ? "text-[0.9em]" : undefined}>
+                      {PLATFORM_REGISTRY[project.platform]?.label ?? project.platform}
+                    </span>
+                  </Badge>
+                )}
+                {project.description && (
+                  <p className="mt-3 break-words text-body-sm text-text-secondary">{project.description}</p>
                 )}
               </Card>
             </li>

@@ -57,9 +57,8 @@ export function ProjectEditDialog({ project }: { project: Project }) {
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Trigger asChild>
-        <Button type="button" size="sm" variant="ghost" className="-mr-2 gap-1.5" aria-label={`Edit ${project.name}`}>
+        <Button type="button" size="icon" variant="ghost" aria-label={`Edit ${project.name}`} title="Edit project">
           <Pencil aria-hidden="true" className="h-4 w-4" />
-          Edit
         </Button>
       </Dialog.Trigger>
       <Dialog.Portal>
