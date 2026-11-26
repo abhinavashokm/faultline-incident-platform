@@ -25,6 +25,7 @@ export default function DashboardLayout({
 
   const { data: projects, isLoading: projectsLoading } = useListProjects();
 
+  const isPersonalSettings = pathname === `/${workspaceSlug}/profile`;
   const isProjectsList = pathname === `/${workspaceSlug}/projects`;
   const isProjectsNew = pathname.endsWith("/projects/new");
   const projectPath = `/${workspaceSlug}/projects/${params.slug}`;
@@ -37,13 +38,13 @@ export default function DashboardLayout({
   // Use router.replace so the previous dashboard URL is not left in history.
   // Avoid redirecting if the user is already in the project shell.
   useEffect(() => {
-    if (!projectsLoading && projects && projects.length === 0 && !isFocusedFlow) {
+    if (!projectsLoading && projects && projects.length === 0 && !isFocusedFlow && !isPersonalSettings) {
       router.replace(`/${workspaceSlug}/projects/new`);
     }
-  }, [projectsLoading, projects, isFocusedFlow, workspaceSlug, router]);
+  }, [projectsLoading, projects, isFocusedFlow, isPersonalSettings, workspaceSlug, router]);
 
   // Show a full-page spinner while loading or while the zero-projects redirect is pending
-  const handlesProjectLoading = isProjectsList || isProjectDetail || isProjectSdkSetup;
+  const handlesProjectLoading = isProjectsList || isProjectDetail || isProjectSdkSetup || isPersonalSettings;
   if (!handlesProjectLoading && (projectsLoading || (!isFocusedFlow && projects && projects.length === 0))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-canvas">

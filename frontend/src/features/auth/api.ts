@@ -59,6 +59,14 @@ export async function fetchCurrentUserApi(): Promise<CurrentUserResponse> {
   return apiClient.get<CurrentUserResponse>("/api/v1/auth/me", { transformCase: false });
 }
 
+export function updateCurrentUserNameApi(fullName: string) {
+  return apiClient.patch<Pick<CurrentUserResponse, "id" | "email" | "full_name">>(
+    "/api/v1/auth/me",
+    { full_name: fullName },
+    { transformCase: false },
+  );
+}
+
 export async function logoutApi(): Promise<void> {
   try {
     await apiClient.post("/api/v1/auth/logout");

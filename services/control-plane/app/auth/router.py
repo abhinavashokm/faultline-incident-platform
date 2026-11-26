@@ -21,6 +21,8 @@ from app.auth.schemas import (
     ResendVerificationResponse,
     SignupRequest,
     TokenResponse,
+    UpdateCurrentUserRequest,
+    UpdatedCurrentUserResponse,
     UserResponse,
     VerifyEmailRequest,
     VerifyEmailResponse,
@@ -236,6 +238,22 @@ async def get_me(
             token_workspace_id=ctx.workspace_id,
             token_role=ctx.role,
         )
+    except InvalidCredentials as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+
+@router.patch("/me", response_model=UpdatedCurrentUserResponse)
+async def update_me(
+    payload: UpdateCurrentUserRequest,
+    ctx: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> UpdatedCurrentUserResponse:
+    try:
+        return await AuthService(session).update_name(ctx.user_id, payload.full_name)
     except InvalidCredentials as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

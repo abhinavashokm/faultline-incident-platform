@@ -30,6 +30,15 @@ class AuthRepository:
         await self.session.flush()
         return user
 
+    async def update_active_user_name(self, user_id: uuid.UUID, full_name: str) -> User | None:
+        stmt = (
+            update(User)
+            .where(User.id == user_id, User.status == "active")
+            .values(full_name=full_name, updated_at=func.now())
+            .returning(User)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none()
+
     async def update_last_login(self, user_id: uuid.UUID, last_login_at: datetime) -> None:
         stmt = (
             update(User)

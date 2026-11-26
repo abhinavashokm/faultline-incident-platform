@@ -24,6 +24,7 @@ from app.auth.schemas import (
     ResendVerificationResponse,
     SignupRequest,
     TokenResponse,
+    UpdatedCurrentUserResponse,
     VerifyEmailRequest,
     VerifyEmailResponse,
     WorkspaceSummary,
@@ -350,6 +351,15 @@ class AuthService:
                 if refresh_session.revoked_at is None:
                     await self.repository.revoke_session(refresh_session.id, "logout")
                     logger.info("Session %s revoked on logout", refresh_session.id)
+
+    async def update_name(
+        self, user_id: uuid.UUID, full_name: str
+    ) -> UpdatedCurrentUserResponse:
+        async with self.session.begin():
+            user = await self.repository.update_active_user_name(user_id, full_name)
+            if user is None:
+                raise InvalidCredentials("User not found or inactive")
+            return UpdatedCurrentUserResponse.model_validate(user)
 
     async def get_me(
         self,

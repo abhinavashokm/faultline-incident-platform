@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { loginApi, signupApi, verifyOtpApi, resendOtpApi, fetchCurrentUserApi } from "./api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { loginApi, signupApi, verifyOtpApi, resendOtpApi, fetchCurrentUserApi, updateCurrentUserNameApi } from "./api";
 import { LoginFormData, SignupFormData, VerifyOtpFormData } from "./schemas";
 import { useAuth } from "./auth-context";
 
@@ -27,15 +27,31 @@ export function useResendOtp() {
   });
 }
 
+const currentUserQueryKey = ["auth", "me"] as const;
+
 export function useCurrentUser() {
   const { isReady, isAuthenticated } = useAuth();
 
   return useQuery({
-    queryKey: ["auth", "me"],
+    queryKey: currentUserQueryKey,
     queryFn: fetchCurrentUserApi,
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: isReady && isAuthenticated,
   });
 }
 
+export function useUpdateCurrentUserName() {
+  const queryClient = useQueryClient();
 
+  return useMutation({
+    mutationFn: updateCurrentUserNameApi,
+    retry: false,
+    onSuccess: async (profile) => {
+      await queryClient.cancelQueries({ queryKey: currentUserQueryKey, exact: true });
+      queryClient.setQueryData<Awaited<ReturnType<typeof fetchCurrentUserApi>>>(
+        currentUserQueryKey,
+        (current) => current?.id === profile.id ? { ...current, ...profile } : current,
+      );
+    },
+  });
+}

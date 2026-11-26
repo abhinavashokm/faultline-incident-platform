@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import (
     AliasChoices,
@@ -8,6 +8,7 @@ from pydantic import (
     ConfigDict,
     EmailStr,
     Field,
+    StringConstraints,
     field_validator,
 )
 
@@ -114,6 +115,20 @@ class CurrentUserResponse(BaseModel):
     created_at: datetime
     workspace: WorkspaceWithRole | None = None
     memberships: list[MembershipResponse] = Field(default_factory=list)
+
+
+class UpdateCurrentUserRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+
+
+class UpdatedCurrentUserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    full_name: str
+    email: str
 
 
 class VerifyEmailRequest(BaseModel):
