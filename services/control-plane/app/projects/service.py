@@ -65,8 +65,8 @@ class ProjectService:
         if member.role not in ("owner", "admin"):
             raise InsufficientPermissions("Insufficient permissions")
 
-    def _build_dsn(self, project_api_key: str, project_id: uuid.UUID) -> str:
-        return f"{settings.dsn_scheme}://{project_api_key}@{settings.dsn_host}/{project_id}"
+    def _build_dsn(self, project_api_key: str) -> str:
+        return f"{settings.dsn_scheme}://{project_api_key}@{settings.dsn_host}"
 
     async def list_projects(
         self, user_id: uuid.UUID, workspace_id: uuid.UUID | None
@@ -136,7 +136,7 @@ class ProjectService:
                 "A project with this slug already exists in the workspace"
             ) from exc
 
-        dsn = self._build_dsn(project_api_key, project_id)
+        dsn = self._build_dsn(project_api_key)
         return project, dsn
 
     async def get_project(
@@ -269,7 +269,7 @@ class ProjectService:
         if key is None or not key.public_key:
             raise ApiKeyNotFound("Project not found")
 
-        dsn = self._build_dsn(key.public_key, project_id)
+        dsn = self._build_dsn(key.public_key)
         return key, dsn
 
     async def rotate_api_key(
@@ -309,6 +309,6 @@ class ProjectService:
             )
             await self.repository.create_api_key(new_key)
 
-        dsn = self._build_dsn(new_project_api_key, project_id)
+        dsn = self._build_dsn(new_project_api_key)
         return new_key, dsn
 
