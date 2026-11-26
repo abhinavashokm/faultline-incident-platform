@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight, RotateCcw } from "lucide-react";
 import { useId, useState } from "react";
 
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -22,8 +23,22 @@ export function StatusActionButton({ transition, onClick }: {
   onClick: () => void;
 }) {
   return (
-    <Button type="button" size="sm" aria-label={transition.label} onClick={onClick}>
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="group gap-2 border border-primary-subdued bg-primary-tint font-semibold text-primary hover:border-primary hover:bg-primary-subdued"
+      onClick={onClick}
+    >
       {transition.label}
+      {transition.target === "open" ? (
+        <RotateCcw className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      ) : (
+        <ArrowRight
+          className="h-3.5 w-3.5 shrink-0 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5"
+          aria-hidden="true"
+        />
+      )}
     </Button>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowUpRight, Bug, Clock3 } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -67,7 +67,7 @@ export default function IncidentDetailPage({
   const unavailable = detail.error instanceof ApiError && [403, 404].includes(detail.error.status);
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-6xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-label-md text-text-secondary">
         <Link
           href={`${projectHref}/incidents`}
@@ -104,95 +104,94 @@ export default function IncidentDetailPage({
         </div>
       ) : (
         <>
-          <header className="space-y-4">
-            <h1 className="break-words text-3xl font-semibold tracking-tight">{incident.title}</h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={incident.severity === "critical" ? "error" : incident.severity === "high" ? "warning" : "neutral"}>
-                {incident.severity} severity
-              </Badge>
-              <StatusBadge status={incident.status} variant={presentation?.variant} />
-              {nextTransition && (
-                <StatusActionButton
-                  transition={nextTransition}
-                  onClick={() => {
-                    statusUpdate.reset();
-                    setConfirmation({ incidentId: incident.id, transition: nextTransition });
-                  }}
-                />
-              )}
-            </div>
-          </header>
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <section aria-labelledby="overview-heading" className="min-w-0 rounded-xl border bg-card p-5 shadow-level-1">
-              <h2 id="overview-heading" className="text-headline-sm">Overview</h2>
-              <p className="mt-3 whitespace-pre-wrap break-words text-sm text-text-secondary">
+          <header className="rounded-xl border bg-card shadow-level-1">
+            <div className="space-y-4 p-5 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={incident.status} variant={presentation?.variant} />
+                  <Badge variant={incident.severity === "critical" ? "error" : incident.severity === "high" ? "warning" : "neutral"} showDot={false}>
+                    {incident.severity} severity
+                  </Badge>
+                </div>
+                {nextTransition && (
+                  <StatusActionButton
+                    transition={nextTransition}
+                    onClick={() => {
+                      statusUpdate.reset();
+                      setConfirmation({ incidentId: incident.id, transition: nextTransition });
+                    }}
+                  />
+                )}
+              </div>
+              <h1 className="break-words text-display-lg-mobile text-foreground sm:text-display-lg">{incident.title}</h1>
+              <p className="max-w-prose whitespace-pre-wrap break-words text-body-md text-text-secondary">
                 {incident.description?.trim() ? incident.description : "No description provided."}
               </p>
+            </div>
+
+            <dl className="grid gap-x-6 gap-y-4 rounded-b-xl border-t bg-canvas px-5 py-4 sm:grid-cols-2 sm:px-6">
+              <div>
+                <dt className="text-label-sm text-text-secondary">Started</dt>
+                <dd className="mt-1 text-body-sm font-medium tabular-nums"><IncidentTime value={incident.startedAt} /></dd>
+              </div>
+              {incident.status === "resolved" && incident.resolvedAt && (
+                <div>
+                  <dt className="text-label-sm text-text-secondary">Resolved</dt>
+                  <dd className="mt-1 text-body-sm font-medium tabular-nums"><IncidentTime value={incident.resolvedAt} /></dd>
+                </div>
+              )}
+            </dl>
+          </header>
+
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <section aria-labelledby="timeline-heading" className="min-w-0 rounded-xl border bg-card shadow-level-1">
+              <h2 id="timeline-heading" className="border-b px-5 py-4 text-title-md">Timeline</h2>
+              {incident.timeline.length ? (
+                <ol className="px-5 py-4">
+                  {incident.timeline.map((entry) => (
+                    <li key={entry.id} className="relative pb-5 pl-5 last:pb-0 before:absolute before:-bottom-2 before:left-[3px] before:top-2 before:w-px before:bg-border last:before:hidden">
+                      <span className="absolute left-0 top-1.5 h-[7px] w-[7px] rounded-full bg-border-hover" aria-hidden="true" />
+                      <p className="whitespace-pre-wrap break-words text-body-sm text-foreground">{entry.message}</p>
+                      <p className="mt-0.5 text-label-sm tabular-nums text-text-secondary"><IncidentTime value={entry.createdAt} /></p>
+                    </li>
+                  ))}
+                </ol>
+              ) : <p className="px-5 py-5 text-body-sm text-text-secondary">No timeline entries yet.</p>}
             </section>
-            <section aria-labelledby="details-heading" className="min-w-0 rounded-xl border bg-card p-5 shadow-level-1">
-              <h2 id="details-heading" className="text-headline-sm">Details</h2>
-              <dl className="mt-4 space-y-3 text-sm">
-                <div>
-                  <dt className="text-muted-foreground">Started</dt>
-                  <dd className="mt-1"><IncidentTime value={incident.startedAt} /></dd>
-                </div>
-                {incident.status === "resolved" && incident.resolvedAt && (
-                  <div>
-                    <dt className="text-muted-foreground">Resolved</dt>
-                    <dd className="mt-1"><IncidentTime value={incident.resolvedAt} /></dd>
-                  </div>
+
+            <section aria-labelledby="issues-heading" className="min-w-0 rounded-xl border bg-card shadow-level-1">
+              <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
+                <h2 id="issues-heading" className="text-title-md">Related issues</h2>
+                {incident.relatedIssues.length > 0 && (
+                  <span className="text-label-md tabular-nums text-text-secondary">{incident.relatedIssues.length}</span>
                 )}
-                <div>
-                  <dt className="text-muted-foreground">Assignee</dt>
-                  <dd className="mt-1 break-all">{incident.assigneeId ?? "Unassigned"}</dd>
-                </div>
-              </dl>
+              </div>
+              {incident.relatedIssues.length ? (
+                <ul className="divide-y divide-border">
+                  {incident.relatedIssues.map((issue) => (
+                    <li key={issue.issueId} className="last:[&>a]:rounded-b-xl">
+                      <Link
+                        href={projectHref + "/issues/" + issue.issueId}
+                        className="group flex items-start justify-between gap-3 px-5 py-3 transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      >
+                        <span className="min-w-0 space-y-1">
+                          <span className="block break-words text-body-sm font-medium group-hover:text-primary">{issue.issueTitle ?? issue.issueId}</span>
+                          {issue.errorType && <span className="block break-words font-mono text-label-sm text-text-secondary">{issue.errorType}</span>}
+                          {issue.occurrenceCount !== null && (
+                            <span className="block text-label-sm tabular-nums text-text-secondary">
+                              {issue.occurrenceCount.toLocaleString()} {issue.occurrenceCount === 1 ? "event" : "events"} at link time
+                            </span>
+                          )}
+                        </span>
+                        <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-text-muted group-hover:text-primary" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="px-5 py-5 text-body-sm text-text-secondary">No related issues linked.</p>}
             </section>
           </div>
 
-          <section aria-labelledby="issues-heading" className="overflow-hidden rounded-xl border bg-card shadow-level-1">
-            <h2 id="issues-heading" className="flex items-center gap-2 border-b bg-canvas px-5 py-4 text-headline-sm">
-              <Bug className="h-5 w-5 text-primary" aria-hidden="true" />
-              Related issues
-            </h2>
-            {incident.relatedIssues.length ? (
-              <ul className="divide-y divide-border">
-                {incident.relatedIssues.map((issue) => (
-                  <li key={issue.issueId} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-                    <div className="min-w-0">
-                      <Link href={`${projectHref}/issues/${issue.issueId}`} className="inline-flex max-w-full items-start gap-1.5 text-sm font-medium text-primary hover:underline">
-                        <span className="min-w-0 break-words">{issue.issueTitle ?? issue.issueId}</span>
-                        <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                      </Link>
-                      {issue.errorType && <p className="break-words font-mono text-xs text-muted-foreground">{issue.errorType}</p>}
-                    </div>
-                    {issue.occurrenceCount !== null && (
-                      <span className="text-xs tabular-nums text-muted-foreground">
-                        {issue.occurrenceCount.toLocaleString()} {issue.occurrenceCount === 1 ? "event" : "events"} at link time
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="px-5 py-4 text-sm text-muted-foreground">No related issues linked.</p>}
-          </section>
-
-          <section aria-labelledby="timeline-heading" className="overflow-hidden rounded-xl border bg-card shadow-level-1">
-            <h2 id="timeline-heading" className="flex items-center gap-2 border-b bg-canvas px-5 py-4 text-headline-sm">
-              <Clock3 className="h-5 w-5 text-primary" aria-hidden="true" />
-              Timeline
-            </h2>
-            {incident.timeline.length ? (
-              <ol className="divide-y divide-border">
-                {incident.timeline.map((entry) => (
-                  <li key={entry.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 py-3">
-                    <p className="min-w-0 whitespace-pre-wrap break-words text-sm">{entry.message}</p>
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground"><IncidentTime value={entry.createdAt} /></span>
-                  </li>
-                ))}
-              </ol>
-            ) : <p className="px-5 py-4 text-sm text-muted-foreground">No timeline entries yet.</p>}
-          </section>
           {transition && (
             <StatusChangeModal
               transition={transition}
