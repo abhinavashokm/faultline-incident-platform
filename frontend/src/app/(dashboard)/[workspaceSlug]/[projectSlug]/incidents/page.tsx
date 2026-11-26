@@ -3,7 +3,7 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronRight, ClipboardList, Plus, Search } from "lucide-react";
+import { ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,14 +132,14 @@ export default function IncidentsPage({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[42rem] text-left text-body-sm">
+            <table className="w-full min-w-[36rem] text-left text-body-sm">
               <caption className="sr-only">Project incidents</caption>
               <thead className="border-b bg-canvas text-label-sm uppercase text-text-secondary">
                 <tr>
-                  {["Incident", "Severity", "Status", "Assignee", "Started"].map((column) => (
+                  {["Incident", "Severity", "Status", "Started"].map((column) => (
                     <th key={column} scope="col" className="px-3.5 py-2.5 font-medium">{column}</th>
                   ))}
-                  <th scope="col" className="w-10"><span className="sr-only">Details</span></th>
+                  <th scope="col" className="px-3.5 py-2.5 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -163,14 +163,22 @@ export default function IncidentsPage({
                         {incident.status.replaceAll("_", " ")}
                       </Badge>
                     </td>
-                    <td className="px-3.5 py-3 text-text-secondary">
-                      {incident.assigneeId ? <span className="block max-w-32 truncate font-mono text-xs" title={incident.assigneeId}>{incident.assigneeId}</span> : "Unassigned"}
-                    </td>
                     <td className="whitespace-nowrap px-3.5 py-3 text-text-secondary">
                       <time dateTime={incident.startedAt}>{startedDate.format(new Date(incident.startedAt))}</time>
                     </td>
                     <td className="px-3.5 py-3">
-                      <ChevronRight className="h-4 w-4 text-text-muted group-hover:text-primary" aria-hidden="true" />
+                      <div className="relative z-10 ml-auto flex w-fit items-center gap-1">
+                        <span title="Incident editing is unavailable">
+                          <Button type="button" size="icon" variant="ghost" className="text-text-secondary" disabled aria-label={`Edit ${incident.title}`}>
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        </span>
+                        <span title="Incident deletion is unavailable">
+                          <Button type="button" size="icon" variant="ghost" className="text-text-secondary" disabled aria-label={`Delete ${incident.title}`}>
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 ))}
