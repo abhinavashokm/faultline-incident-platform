@@ -40,7 +40,7 @@ Routing uses longest-prefix matching. If no route matches, the Gateway returns `
 | `/api/v1/projects` | `control-plane` | `http://control-plane:8000` | Project CRUD, API keys, and project settings |
 | `/api/v1/events` | `ingestion` | `http://ingestion:8001` | SDK error event intake |
 | `/api/v1/projects/{project_id}/alerts` | `alerting` | `http://alerting:8003` | *Disabled* (Service not yet implemented) |
-| `/api/v1/projects/{project_id}/incidents` | `incident` | `http://incident:8004` | *Disabled* (Service not yet implemented) |
+| `/api/v1/projects/{project_id}/incidents` | `incident` | `http://incident:8004` | List (`GET`) and create (`POST`) incidents. Enabled in Compose with `GATEWAY_ENABLE_INCIDENT`. |
 | `/api/v1/projects/{project_id}/investigations` | `investigation` | `http://investigation:8005` | *Disabled* (Service not yet implemented) |
 
 ---

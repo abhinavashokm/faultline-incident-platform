@@ -1,6 +1,6 @@
 # Build context: repo root
 # Used by the 'migrate' compose service to run Alembic migrations for
-# control-plane and processing.
+# Control Plane, Processing, Alerting, and Incident.
 
 FROM python:3.12-slim
 
@@ -28,6 +28,9 @@ RUN pip install /app/processing
 # ── Install alerting (for its alembic env + models) ──────────────────────────
 COPY services/alerting /app/alerting
 RUN pip install /app/alerting
+
+# Incident uses its local app package and the installed migration dependencies.
+COPY services/incident /app/incident
 
 # ── Migration entrypoint script ───────────────────────────────────────────────
 COPY deploy/migrate/migrate.sh /migrate.sh

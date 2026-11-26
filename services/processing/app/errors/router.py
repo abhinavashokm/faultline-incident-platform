@@ -30,6 +30,7 @@ async def list_issues(
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     cursor: Annotated[str | None, Query()] = None,
     status: Annotated[Literal["unresolved", "resolved", "ignored"] | None, Query()] = None,
+    search: Annotated[str | None, Query(max_length=500)] = None,
 ) -> PaginatedResponse[IssueListItem]:
     service = ErrorsHttpService(session)
     return await service.list_issues(
@@ -38,6 +39,7 @@ async def list_issues(
         status_filter=status,
         limit=limit,
         cursor_str=cursor,
+        search=search,
     )
 
 

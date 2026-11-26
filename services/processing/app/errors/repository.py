@@ -127,6 +127,7 @@ class ErrorsRepository:
         status: str | None,
         limit: int,
         cursor: tuple[datetime, UUID] | None,
+        search: str | None = None,
     ) -> list[dict[str, Any]]:
         """List issues ordered by last_seen_at DESC, id DESC with keyset pagination."""
         stmt = select(
@@ -148,6 +149,8 @@ class ErrorsRepository:
         )
         if status:
             stmt = stmt.where(Issue.status == status)
+        if search:
+            stmt = stmt.where(Issue.title.icontains(search, autoescape=True))
 
         if cursor:
             cursor_last_seen, cursor_id = cursor

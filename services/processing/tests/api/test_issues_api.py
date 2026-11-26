@@ -271,6 +271,49 @@ async def test_status_filter_and_invalid_status_422(
 
 
 @pytest.mark.asyncio
+async def test_issue_title_search_is_literal_and_scoped_across_pages(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    test_workspace_id: uuid.UUID,
+    test_project_id: uuid.UUID,
+):
+    first = await insert_issue(
+        session_factory, test_workspace_id, test_project_id, title="Quota 100%_used"
+    )
+    second = await insert_issue(
+        session_factory, test_workspace_id, test_project_id, title="QUOTA 100%_USED (retry)", status="resolved"
+    )
+    await insert_issue(
+        session_factory, test_workspace_id, test_project_id, title="Quota 1000-used"
+    )
+    await insert_issue(
+        session_factory, uuid.uuid4(), test_project_id, title="Quota 100%_used"
+    )
+    await insert_issue(
+        session_factory, test_workspace_id, uuid.uuid4(), title="Quota 100%_used"
+    )
+
+    url = f"/api/v1/projects/{test_project_id}/issues"
+    params = {"search": "  quota 100%_used  ", "limit": 1}
+    page_one = await client.get(url, params=params)
+    assert page_one.status_code == 200
+    assert page_one.json()["meta"]["has_more"]
+    page_two = await client.get(
+        url, params={**params, "cursor": page_one.json()["meta"]["next_cursor"]}
+    )
+    assert page_two.status_code == 200
+    assert not page_two.json()["meta"]["has_more"]
+    assert {page.json()["items"][0]["id"] for page in (page_one, page_two)} == {
+        str(first), str(second)
+    }
+
+    open_page = await client.get(url, params={**params, "status": "unresolved"})
+    assert open_page.status_code == 200
+    assert [item["id"] for item in open_page.json()["items"]] == [str(first)]
+    assert not open_page.json()["meta"]["has_more"]
+
+
+@pytest.mark.asyncio
 async def test_pagination_keyset_with_duplicate_last_seen_at(
     client: AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],

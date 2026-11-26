@@ -71,7 +71,7 @@ export function Sidebar({
     },
     {
       name: "Incidents",
-      href: `${basePrefix}/incidents`,
+      href: currentProjectSlug ? `${basePrefix}/incidents` : `/${workspaceSlug}/projects`,
       icon: Flame,
     },
     {

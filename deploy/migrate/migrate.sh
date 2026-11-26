@@ -10,4 +10,7 @@ cd /app/processing && alembic upgrade head
 echo "Running alerting migrations..."
 cd /app/alerting && alembic upgrade head
 
+echo "Running incident migrations..."
+cd /app/incident && alembic upgrade head
+
 echo "All migrations complete."
