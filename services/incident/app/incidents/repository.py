@@ -46,6 +46,13 @@ class IncidentRepository:
         )
         return list((await self.session.scalars(query)).all())
 
+    async def update_issue_links(
+        self, removed: list[IncidentIssue], added: list[IncidentIssue]
+    ) -> None:
+        for issue in removed:
+            await self.session.delete(issue)
+        self.session.add_all(added)
+
     async def delete_incident(self, incident: Incident) -> None:
         await self.session.execute(
             delete(IncidentIssue).where(IncidentIssue.incident_id == incident.id)

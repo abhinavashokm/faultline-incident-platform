@@ -12,6 +12,7 @@ from app.incidents.schemas import (
     CreateIncidentRequest,
     IncidentDetail,
     IncidentListItem,
+    UpdateIncidentDetailsRequest,
 )
 from app.incidents.service import IncidentService
 
@@ -64,6 +65,27 @@ async def get_incident(
         session, request.app.state.http_client, request.app.state.settings
     )
     return await service.get_detail(project_id, incident_id, principal, credentials.credentials)
+
+
+@router.patch(
+    "/projects/{project_id}/incidents/{incident_id}/details",
+    response_model=CreatedIncident,
+)
+async def update_incident_details(
+    project_id: UUID,
+    incident_id: UUID,
+    payload: UpdateIncidentDetailsRequest,
+    request: Request,
+    principal: Annotated[Principal, Depends(get_principal)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(http_bearer)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> CreatedIncident:
+    service = IncidentService(
+        session, request.app.state.http_client, request.app.state.settings
+    )
+    return await service.update_details(
+        project_id, incident_id, payload, principal, credentials.credentials
+    )
 
 
 @router.delete(

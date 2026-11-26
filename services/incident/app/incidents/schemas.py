@@ -16,6 +16,15 @@ class CreateIncidentRequest(BaseModel):
     assignee_id: UUID | None = None
 
 
+class UpdateIncidentDetailsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: Title
+    severity: Severity
+    description: str | None
+    related_issue_ids: list[UUID] | None = None
+
+
 class CreatedIncident(BaseModel):
     id: UUID
     title: str

@@ -187,11 +187,11 @@ export default function IncidentsPage({
                     </td>
                     <td className="px-3.5 py-3">
                       <div className="relative z-10 ml-auto flex w-fit items-center gap-1">
-                        <span title="Incident editing is unavailable">
-                          <Button type="button" size="icon" variant="ghost" className="text-text-secondary" disabled aria-label={`Edit ${incident.title}`}>
+                        <Button size="icon" variant="ghost" className="text-text-secondary" asChild>
+                          <Link href={`${incidentsHref}/${incident.id}/edit`} aria-label={`Edit ${incident.title}`} title="Edit incident">
                             <Pencil className="h-4 w-4" aria-hidden="true" />
-                          </Button>
-                        </span>
+                          </Link>
+                        </Button>
                         <Button
                           type="button"
                           size="icon"

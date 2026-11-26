@@ -18,6 +18,7 @@ from app.incidents.schemas import (
     IssueSnapshot,
     RelatedIssue,
     TimelineEntry,
+    UpdateIncidentDetailsRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,39 @@ class IncidentService:
         control_plane = str(self.settings.control_plane_url).rstrip("/")
         await self._get_resource(f"{control_plane}/api/v1/projects/{project_id}", token, "Project")
 
+    async def _load_issue_snapshots(
+        self, project_id: UUID, issue_ids: list[UUID], token: str
+    ) -> list[IssueSnapshot]:
+        project_path = f"/api/v1/projects/{project_id}"
+        processing = str(self.settings.processing_url).rstrip("/")
+        snapshots: list[IssueSnapshot] = []
+        for issue_id in dict.fromkeys(issue_ids):
+            response = await self._get_resource(
+                f"{processing}{project_path}/issues/{issue_id}", token, "Issue"
+            )
+            try:
+                snapshot = IssueSnapshot.model_validate_json(response.content)
+                if snapshot.id != issue_id:
+                    raise ValueError("Issue ID mismatch")
+            except ValueError as exc:
+                logger.warning("Incident issue lookup returned an invalid snapshot")
+                raise HTTPException(503, "Resource verification temporarily unavailable") from exc
+            snapshots.append(snapshot)
+
+        return snapshots
+
+    @staticmethod
+    def _issue_link(incident_id: UUID, issue: IssueSnapshot) -> IncidentIssue:
+        return IncidentIssue(
+            incident_id=incident_id,
+            issue_id=issue.id,
+            issue_title=issue.title[:255],
+            error_type=issue.exception_type[:255] if issue.exception_type else None,
+            first_seen_at=as_utc_naive(issue.first_seen),
+            last_seen_at=as_utc_naive(issue.last_seen),
+            occurrence_count=issue.occurrence_count,
+        )
+
     async def list_for_project(
         self, project_id: UUID, principal: Principal, token: str
     ) -> list[IncidentListItem]:
@@ -88,6 +122,52 @@ class IncidentService:
             timeline=[TimelineEntry.model_validate(entry) for entry in timeline],
         )
 
+    async def update_details(
+        self,
+        project_id: UUID,
+        incident_id: UUID,
+        payload: UpdateIncidentDetailsRequest,
+        principal: Principal,
+        token: str,
+    ) -> CreatedIncident:
+        await self._verify_project(project_id, token)
+        async with self.session.begin():
+            incident = await self.repository.get_for_project(
+                principal.workspace_id, project_id, incident_id, for_update=True
+            )
+            if incident is None:
+                raise HTTPException(404, "Incident not found")
+
+            links_changed = False
+            if payload.related_issue_ids is not None:
+                links_changed = await self._sync_issue_links(
+                    project_id, incident.id, payload.related_issue_ids, token
+                )
+            incident.title = payload.title
+            incident.severity = payload.severity
+            incident.description = payload.description
+            if links_changed or self.session.is_modified(incident):
+                incident.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            return CreatedIncident.model_validate(incident)
+
+    async def _sync_issue_links(
+        self, project_id: UUID, incident_id: UUID, issue_ids: list[UUID], token: str
+    ) -> bool:
+        current = {
+            link.issue_id: link for link in await self.repository.list_related_issues(incident_id)
+        }
+        requested = dict.fromkeys(issue_ids)
+        removed = [link for issue_id, link in current.items() if issue_id not in requested]
+        new_ids = [issue_id for issue_id in requested if issue_id not in current]
+        if not removed and not new_ids:
+            return False
+
+        snapshots = await self._load_issue_snapshots(project_id, new_ids, token)
+        await self.repository.update_issue_links(
+            removed, [self._issue_link(incident_id, issue) for issue in snapshots]
+        )
+        return True
+
     async def delete_incident(
         self, project_id: UUID, incident_id: UUID, principal: Principal, token: str
     ) -> None:
@@ -104,27 +184,13 @@ class IncidentService:
     async def create(
         self, project_id: UUID, payload: CreateIncidentRequest, principal: Principal, token: str
     ) -> CreatedIncident:
-        project_path = f"/api/v1/projects/{project_id}"
         await self._verify_project(project_id, token)
 
         # The MVP supports self-assignment within the verified active workspace.
         if payload.assignee_id is not None and payload.assignee_id != principal.user_id:
             raise HTTPException(404, "Assignee not found")
 
-        processing = str(self.settings.processing_url).rstrip("/")
-        snapshots: list[IssueSnapshot] = []
-        for issue_id in dict.fromkeys(payload.related_issue_ids):
-            response = await self._get_resource(
-                f"{processing}{project_path}/issues/{issue_id}", token, "Issue"
-            )
-            try:
-                snapshot = IssueSnapshot.model_validate_json(response.content)
-                if snapshot.id != issue_id:
-                    raise ValueError("Issue ID mismatch")
-            except ValueError as exc:
-                logger.warning("Incident issue lookup returned an invalid snapshot")
-                raise HTTPException(503, "Resource verification temporarily unavailable") from exc
-            snapshots.append(snapshot)
+        snapshots = await self._load_issue_snapshots(project_id, payload.related_issue_ids, token)
 
         async with self.session.begin():
             incident = Incident(
@@ -145,17 +211,6 @@ class IncidentService:
                     event_type="incident_created",
                     message="Incident created",
                 ),
-                [
-                    IncidentIssue(
-                        incident_id=incident.id,
-                        issue_id=issue.id,
-                        issue_title=issue.title[:255],
-                        error_type=issue.exception_type[:255] if issue.exception_type else None,
-                        first_seen_at=as_utc_naive(issue.first_seen),
-                        last_seen_at=as_utc_naive(issue.last_seen),
-                        occurrence_count=issue.occurrence_count,
-                    )
-                    for issue in snapshots
-                ],
+                [self._issue_link(incident.id, issue) for issue in snapshots],
             )
         return CreatedIncident.model_validate(incident)

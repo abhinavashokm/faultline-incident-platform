@@ -11,10 +11,12 @@ import { listIssuesApi } from "@/features/issues/api";
 import type { IssueListItem } from "@/features/issues/types";
 import { cn } from "@/lib/utils";
 
+export type SelectedIssue = Pick<IssueListItem, "id" | "title">;
+
 type IssuePickerProps = {
   projectId: string;
-  selected: IssueListItem[];
-  onChange: (issues: IssueListItem[]) => void;
+  selected: SelectedIssue[];
+  onChange: (issues: SelectedIssue[]) => void;
 };
 
 const lastSeenFormat = new Intl.DateTimeFormat(undefined, {
@@ -47,7 +49,7 @@ export function IssuePicker({ projectId, selected, onChange }: IssuePickerProps)
   const selectedIds = new Set(selected.map((issue) => issue.id));
   const showRetry = query.isError && !issues.length;
 
-  function toggle(issue: IssueListItem) {
+  function toggle(issue: SelectedIssue) {
     onChange(selectedIds.has(issue.id)
       ? selected.filter((item) => item.id !== issue.id)
       : [...selected, issue]);

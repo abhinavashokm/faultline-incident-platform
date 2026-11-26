@@ -6,6 +6,14 @@
   `assignee_id`, and `started_at`.
 - `POST /api/v1/projects/{project_id}/incidents` creates an incident in the
   active workspace and returns its ID, title, severity, and status.
+- `PATCH /api/v1/projects/{project_id}/incidents/{incident_id}/details` updates
+  the incident's title, severity, and description. Send all three fields and
+  use `null` to clear the description. Optionally send `related_issue_ids` to
+  replace the linked issue set. An empty array removes all links. Omitting the
+  field or sending `null` keeps the existing links. Newly linked issues must
+  belong to the same project and workspace. Requires a Bearer access token and
+  returns the ID, title, severity, and current status. Missing or inaccessible
+  incidents return `404 Not Found`.
 - `DELETE /api/v1/projects/{project_id}/incidents/{incident_id}` permanently
   removes the incident, its timeline entries, and its issue links in one
   transaction. The linked issues stay in Processing. Requires a Bearer access

@@ -1,10 +1,8 @@
 import { apiClient } from "@/lib/api-client";
 
-export type IncidentSeverity = "low" | "medium" | "high" | "critical";
-
 type CreateIncidentPayload = {
   title: string;
-  severity: IncidentSeverity;
+  severity: string;
   description?: string;
   relatedIssueIds?: string[];
 };
@@ -58,4 +56,22 @@ export function getIncident(projectId: string, incidentId: string, signal: Abort
 
 export function deleteIncident(projectId: string, incidentId: string) {
   return apiClient.delete(`/api/v1/projects/${projectId}/incidents/${encodeURIComponent(incidentId)}`);
+}
+
+type UpdateIncidentDetailsPayload = {
+  title: string;
+  severity: string;
+  description: string | null;
+  relatedIssueIds: string[];
+};
+
+export function updateIncidentDetails(
+  projectId: string,
+  incidentId: string,
+  payload: UpdateIncidentDetailsPayload,
+) {
+  return apiClient.patch<CreatedIncident>(
+    `/api/v1/projects/${projectId}/incidents/${encodeURIComponent(incidentId)}/details`,
+    payload,
+  );
 }
