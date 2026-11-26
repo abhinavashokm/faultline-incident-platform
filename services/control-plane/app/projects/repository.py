@@ -3,10 +3,10 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.projects.models import Project, ProjectApiKey, ProjectSettings
+from app.projects.models import Project, ProjectApiKey, ProjectSettings, Release
 
 
 class ProjectRepository:
@@ -156,3 +156,27 @@ class ProjectRepository:
             )
             .values(revoked_at=revoked_at)
         )
+
+    async def get_active_release_key_by_hash(self, key_hash: str) -> ProjectApiKey | None:
+        query = select(ProjectApiKey).where(
+            ProjectApiKey.key_hash == key_hash,
+            ProjectApiKey.key_type == "release",
+            ProjectApiKey.revoked_at.is_(None),
+            or_(ProjectApiKey.expires_at.is_(None), ProjectApiKey.expires_at > func.now()),
+        )
+        return (await self.session.execute(query)).scalar_one_or_none()
+
+    async def get_release(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID, version: str
+    ) -> Release | None:
+        query = select(Release).where(
+            Release.workspace_id == workspace_id,
+            Release.project_id == project_id,
+            Release.version == version,
+        )
+        return (await self.session.execute(query)).scalar_one_or_none()
+
+    async def create_release(self, release: Release) -> Release:
+        self.session.add(release)
+        await self.session.flush()
+        return release

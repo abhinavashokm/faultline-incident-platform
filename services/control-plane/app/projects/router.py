@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import AuthContext, current_user
@@ -14,6 +15,8 @@ from app.projects.schemas import (
     ProjectSettingsResponse,
     ProjectSettingsUpdateRequest,
     ProjectUpdateRequest,
+    ReleaseCreateRequest,
+    ReleaseCreateResponse,
     ReleaseKeyCreateResponse,
     ReleaseKeyStatusResponse,
 )
@@ -21,12 +24,15 @@ from app.projects.service import (
     ApiKeyNotFound,
     DuplicateSlugError,
     InsufficientPermissions,
+    InvalidReleaseKey,
     ProjectNotFound,
     ProjectService,
     ReleaseKeyAlreadyExists,
+    ReleaseVersionConflict,
 )
 
 router = APIRouter()
+release_key_bearer = HTTPBearer(auto_error=False, scheme_name="ReleaseKeyBearer")
 
 
 @router.get(
@@ -419,3 +425,41 @@ async def _replace_project_release_key(
     assert key.key_prefix is not None
     response.headers["Cache-Control"] = "no-store"
     return ReleaseKeyCreateResponse(id=key.id, key_prefix=key.key_prefix, token=token)
+
+
+@router.post(
+    "/{project_id}/releases",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ReleaseCreateResponse,
+    responses={
+        200: {"model": ReleaseCreateResponse, "description": "Existing release returned"},
+        401: {"description": "Missing or invalid release token"},
+        404: {"description": "Project not found"},
+        409: {"description": "Release version already has different metadata"},
+    },
+)
+async def create_project_release(
+    project_id: uuid.UUID,
+    payload: ReleaseCreateRequest,
+    response: Response,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(release_key_bearer)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReleaseCreateResponse:
+    try:
+        if credentials is None:
+            raise InvalidReleaseKey("Missing or invalid credentials")
+        release, created = await ProjectService(session).register_release(
+            credentials.credentials, project_id, payload
+        )
+    except InvalidReleaseKey as exc:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail=str(exc), headers={"WWW-Authenticate": "Bearer"}
+        ) from exc
+    except ProjectNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ReleaseVersionConflict as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return ReleaseCreateResponse(id=release.id, version=release.version, commit_sha=release.commit_sha)

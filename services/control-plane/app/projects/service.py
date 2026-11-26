@@ -10,12 +10,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.projects.models import Project, ProjectApiKey, ProjectSettings
+from app.projects.models import Project, ProjectApiKey, ProjectSettings, Release
 from app.projects.repository import ProjectRepository
 from app.projects.schemas import (
     ProjectCreateRequest,
     ProjectSettingsUpdateRequest,
     ProjectUpdateRequest,
+    ReleaseCreateRequest,
 )
 from app.workspaces.models import WorkspaceMember
 from app.workspaces.repository import WorkspaceRepository
@@ -45,6 +46,14 @@ class ApiKeyNotFound(ProjectError):
 
 class ReleaseKeyAlreadyExists(ProjectError):
     """Raised when a project already has an active release key."""
+
+
+class InvalidReleaseKey(ProjectError):
+    """Raised when CI credentials are missing or invalid."""
+
+
+class ReleaseVersionConflict(ProjectError):
+    """Raised when a release version already has different metadata."""
 
 
 class ProjectService:
@@ -371,3 +380,41 @@ class ProjectService:
             )
 
         return key, token
+
+    async def register_release(
+        self, token: str, project_id: uuid.UUID, payload: ReleaseCreateRequest
+    ) -> tuple[Release, bool]:
+        key_hash = sha256(token.encode("utf-8")).hexdigest()
+        async with self.session.begin():
+            key = await self.repository.get_active_release_key_by_hash(key_hash)
+            if key is None:
+                raise InvalidReleaseKey("Missing or invalid credentials")
+            if key.project_id != project_id:
+                raise ProjectNotFound("Project not found")
+
+            workspace_id = key.workspace_id
+            # Release registration and key rotation acquire the same project lock.
+            project = await self.repository.get_project_for_update(workspace_id, project_id)
+            if project is None:
+                raise ProjectNotFound("Project not found")
+            key = await self.repository.get_active_release_key_by_hash(key_hash)
+            if key is None:
+                raise InvalidReleaseKey("Missing or invalid credentials")
+
+            release = await self.repository.get_release(workspace_id, project_id, payload.version)
+            if release is not None:
+                if (release.commit_sha, release.artifact_ref) != (payload.commit_sha, payload.artifact_ref):
+                    raise ReleaseVersionConflict("Release version already has different metadata")
+                return release, False
+
+            release = await self.repository.create_release(
+                Release(
+                    workspace_id=workspace_id,
+                    project_id=project_id,
+                    version=payload.version,
+                    commit_sha=payload.commit_sha,
+                    artifact_ref=payload.artifact_ref,
+                    created_by_key_id=key.id,
+                )
+            )
+            return release, True
