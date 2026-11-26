@@ -16,7 +16,7 @@ export default function IncidentsPage({
 }: {
   params: { workspaceSlug: string; projectSlug: string };
 }) {
-  const createHref = `/${params.workspaceSlug}/${params.projectSlug}/incidents/new`;
+  const incidentsHref = `/${params.workspaceSlug}/${params.projectSlug}/incidents`;
   const projectQuery = useProjectBySlug(params.projectSlug);
   const projectId = projectQuery.project?.id;
   const incidents = useQuery({
@@ -40,7 +40,7 @@ export default function IncidentsPage({
           Incidents
         </h1>
         <Button className="gap-2" asChild>
-          <Link href={createHref}>
+          <Link href={`${incidentsHref}/new`}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Create incident
           </Link>
@@ -83,7 +83,9 @@ export default function IncidentsPage({
               incidents.data.map((incident) => (
                 <tr key={incident.id} className="border-b last:border-b-0">
                   <th scope="row" className="px-4 py-3 font-medium text-foreground">
-                    {incident.title}
+                    <Link href={`${incidentsHref}/${incident.id}`} className="hover:text-primary hover:underline focus-visible:underline">
+                      {incident.title}
+                    </Link>
                   </th>
                   <td className="px-4 py-3 capitalize">{incident.severity}</td>
                   <td className="px-4 py-3 capitalize">{incident.status.replaceAll("_", " ")}</td>

@@ -51,7 +51,7 @@ export default function CreateIncidentPage({
     onSuccess: (incident, projectId) => {
       void queryClient.invalidateQueries({ queryKey: incidentsQueryKey(projectId) });
       toast({ title: "Incident created", description: incident.title, variant: "success" });
-      router.replace(listHref);
+      router.replace(`${listHref}/${incident.id}`);
     },
   });
 

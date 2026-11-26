@@ -32,3 +32,26 @@ export function listIncidents(projectId: string) {
 export function createIncident(projectId: string, payload: CreateIncidentPayload) {
   return apiClient.post<CreatedIncident>(`/api/v1/projects/${projectId}/incidents`, payload);
 }
+
+type IncidentDetail = IncidentListItem & {
+  description: string | null;
+  relatedIssues: {
+    issueId: string;
+    issueTitle: string | null;
+    errorType: string | null;
+    occurrenceCount: number | null;
+  }[];
+  timeline: {
+    id: string;
+    eventType: string;
+    message: string;
+    createdAt: string;
+  }[];
+};
+
+export function getIncident(projectId: string, incidentId: string, signal: AbortSignal) {
+  return apiClient.get<IncidentDetail>(
+    `/api/v1/projects/${projectId}/incidents/${encodeURIComponent(incidentId)}`,
+    { signal },
+  );
+}

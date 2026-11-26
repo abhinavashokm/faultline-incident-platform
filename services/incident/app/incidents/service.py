@@ -10,7 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.incidents.models import Incident, IncidentIssue, IncidentTimelineEntry
 from app.incidents.repository import IncidentRepository
-from app.incidents.schemas import CreatedIncident, CreateIncidentRequest, IncidentListItem, IssueSnapshot
+from app.incidents.schemas import (
+    CreatedIncident,
+    CreateIncidentRequest,
+    IncidentDetail,
+    IncidentListItem,
+    IssueSnapshot,
+    RelatedIssue,
+    TimelineEntry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +63,30 @@ class IncidentService:
         await self._verify_project(project_id, token)
         incidents = await self.repository.list_for_project(principal.workspace_id, project_id)
         return [IncidentListItem.model_validate(incident) for incident in incidents]
+
+    async def get_detail(
+        self, project_id: UUID, incident_id: UUID, principal: Principal, token: str
+    ) -> IncidentDetail:
+        await self._verify_project(project_id, token)
+        incident = await self.repository.get_for_project(
+            principal.workspace_id, project_id, incident_id
+        )
+        if incident is None:
+            raise HTTPException(404, "Incident not found")
+
+        issues = await self.repository.list_related_issues(incident.id)
+        timeline = await self.repository.list_timeline(incident.id)
+        return IncidentDetail(
+            id=incident.id,
+            title=incident.title,
+            severity=incident.severity,
+            status=incident.status,
+            assigned_to=incident.assigned_to,
+            started_at=incident.started_at,
+            description=incident.description,
+            related_issues=[RelatedIssue.model_validate(issue) for issue in issues],
+            timeline=[TimelineEntry.model_validate(entry) for entry in timeline],
+        )
 
     async def create(
         self, project_id: UUID, payload: CreateIncidentRequest, principal: Principal, token: str

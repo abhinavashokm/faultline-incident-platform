@@ -31,9 +31,41 @@ class IncidentListItem(CreatedIncident):
 
     @field_serializer("started_at")
     def serialize_started_at(self, value: datetime) -> str:
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return value.isoformat()
+        return utc_isoformat(value)
+
+
+def utc_isoformat(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
+
+
+class RelatedIssue(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    issue_id: UUID
+    issue_title: str | None
+    error_type: str | None
+    occurrence_count: int | None
+
+
+class TimelineEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    event_type: str
+    message: str
+    created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime) -> str:
+        return utc_isoformat(value)
+
+
+class IncidentDetail(IncidentListItem):
+    description: str | None
+    related_issues: list[RelatedIssue]
+    timeline: list[TimelineEntry]
 
 
 class IssueSnapshot(BaseModel):
