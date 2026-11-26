@@ -3,10 +3,10 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.projects.models import Project, ProjectApiKey, ProjectSettings
+from app.projects.models import Deployment, Project, ProjectApiKey, ProjectSettings, Release
 
 
 class ProjectRepository:
@@ -126,3 +126,80 @@ class ProjectRepository:
         result = await self.session.execute(stmt)
         return int(result.rowcount)  # type: ignore[attr-defined]
 
+
+    async def get_active_release_key_prefix(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> str | None:
+        query = (
+            select(ProjectApiKey.key_prefix)
+            .where(
+                ProjectApiKey.workspace_id == workspace_id,
+                ProjectApiKey.project_id == project_id,
+                ProjectApiKey.key_type == "release",
+                ProjectApiKey.revoked_at.is_(None),
+            )
+            .order_by(ProjectApiKey.created_at.desc(), ProjectApiKey.id.desc())
+            .limit(1)
+        )
+        return (await self.session.execute(query)).scalar_one_or_none()
+
+    async def revoke_active_release_keys(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID, revoked_at: datetime
+    ) -> None:
+        await self.session.execute(
+            update(ProjectApiKey)
+            .where(
+                ProjectApiKey.workspace_id == workspace_id,
+                ProjectApiKey.project_id == project_id,
+                ProjectApiKey.key_type == "release",
+                ProjectApiKey.revoked_at.is_(None),
+            )
+            .values(revoked_at=revoked_at)
+        )
+
+    async def get_active_release_key_by_hash(self, key_hash: str) -> ProjectApiKey | None:
+        query = select(ProjectApiKey).where(
+            ProjectApiKey.key_hash == key_hash,
+            ProjectApiKey.key_type == "release",
+            ProjectApiKey.revoked_at.is_(None),
+            or_(ProjectApiKey.expires_at.is_(None), ProjectApiKey.expires_at > func.now()),
+        )
+        return (await self.session.execute(query)).scalar_one_or_none()
+
+    async def get_release(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID, version: str
+    ) -> Release | None:
+        query = select(Release).where(
+            Release.workspace_id == workspace_id,
+            Release.project_id == project_id,
+            Release.version == version,
+        )
+        return (await self.session.execute(query)).scalar_one_or_none()
+
+    async def create_release(self, release: Release) -> Release:
+        self.session.add(release)
+        await self.session.flush()
+        return release
+
+    async def list_releases(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> Sequence[Release]:
+        query = (
+            select(Release)
+            .where(Release.workspace_id == workspace_id, Release.project_id == project_id)
+            .order_by(Release.created_at.desc(), Release.id.desc())
+        )
+        return (await self.session.execute(query)).scalars().all()
+
+    async def list_deployments(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> Sequence[Deployment]:
+        query = (
+            select(Deployment)
+            .where(
+                Deployment.workspace_id == workspace_id,
+                Deployment.project_id == project_id,
+            )
+            .order_by(Deployment.created_at.desc(), Deployment.id.desc())
+        )
+        return (await self.session.execute(query)).scalars().all()

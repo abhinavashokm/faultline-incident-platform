@@ -51,3 +51,18 @@ export async function checkFirstEventStatusApi(
     status: "waiting",
   };
 }
+
+type ReleaseKeyStatus = { keyPrefix: string | null };
+type ReleaseKeyResult = { keyPrefix: string; token: string };
+
+export async function getReleaseKeyApi(projectId: string, signal?: AbortSignal): Promise<ReleaseKeyStatus> {
+  return apiClient.get<ReleaseKeyStatus>(`/api/v1/projects/${projectId}/release-keys`, { signal });
+}
+
+export async function createReleaseKeyApi(projectId: string): Promise<ReleaseKeyResult> {
+  return apiClient.post<ReleaseKeyResult>(`/api/v1/projects/${projectId}/release-keys`);
+}
+
+export async function rotateReleaseKeyApi(projectId: string): Promise<ReleaseKeyResult> {
+  return apiClient.post<ReleaseKeyResult>(`/api/v1/projects/${projectId}/release-keys/rotate`);
+}

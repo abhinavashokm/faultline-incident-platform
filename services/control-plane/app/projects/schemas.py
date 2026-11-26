@@ -138,3 +138,66 @@ class ProjectApiKeyResponse(BaseModel):
     last_used_at: datetime | None = None
     created_at: datetime
 
+
+class ReleaseKeyCreateResponse(BaseModel):
+    id: uuid.UUID
+    key_prefix: str
+    token: str
+
+
+class ReleaseKeyStatusResponse(BaseModel):
+    key_prefix: str | None
+
+
+class ReleaseCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: str = Field(min_length=1, max_length=150)
+    commit_sha: str = Field(min_length=1, max_length=64)
+    artifact_ref: str | None = Field(default=None, min_length=1, max_length=300)
+
+    @field_validator("version")
+    @classmethod
+    def validate_release_version(cls, version: str) -> str:
+        if any(char.isspace() or char == "\x00" for char in version):
+            raise ValueError("Release version cannot contain whitespace or null characters")
+        return version
+
+    @field_validator("commit_sha")
+    @classmethod
+    def validate_commit_sha(cls, commit_sha: str) -> str:
+        if re.fullmatch(r"[0-9a-f]+", commit_sha) is None:
+            raise ValueError("Commit SHA must contain only lowercase hexadecimal characters")
+        return commit_sha
+
+    @field_validator("artifact_ref")
+    @classmethod
+    def validate_artifact_ref(cls, artifact_ref: str | None) -> str | None:
+        if artifact_ref is not None and "\x00" in artifact_ref:
+            raise ValueError("Artifact reference cannot contain null characters")
+        return artifact_ref
+
+
+class ReleaseCreateResponse(BaseModel):
+    id: uuid.UUID
+    version: str
+    commit_sha: str | None
+
+
+class ReleaseDeploymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    environment: str
+    kind: str
+    status: str
+    external_run_id: str | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class ReleaseListItem(ReleaseCreateResponse):
+    artifact_ref: str | None
+    created_at: datetime
+    deployments: list[ReleaseDeploymentResponse]

@@ -3,18 +3,20 @@ import secrets
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from hashlib import sha256
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.projects.models import Project, ProjectApiKey, ProjectSettings
+from app.projects.models import Deployment, Project, ProjectApiKey, ProjectSettings, Release
 from app.projects.repository import ProjectRepository
 from app.projects.schemas import (
     ProjectCreateRequest,
     ProjectSettingsUpdateRequest,
     ProjectUpdateRequest,
+    ReleaseCreateRequest,
 )
 from app.workspaces.models import WorkspaceMember
 from app.workspaces.repository import WorkspaceRepository
@@ -40,6 +42,18 @@ class InsufficientPermissions(ProjectError):
 
 class ApiKeyNotFound(ProjectError):
     """Raised when an active API key is not found for the project."""
+
+
+class ReleaseKeyAlreadyExists(ProjectError):
+    """Raised when a project already has an active release key."""
+
+
+class InvalidReleaseKey(ProjectError):
+    """Raised when CI credentials are missing or invalid."""
+
+
+class ReleaseVersionConflict(ProjectError):
+    """Raised when a release version already has different metadata."""
 
 
 class ProjectService:
@@ -312,3 +326,107 @@ class ProjectService:
         dsn = self._build_dsn(new_project_api_key)
         return new_key, dsn
 
+    async def get_release_key_prefix(
+        self,
+        user_id: uuid.UUID,
+        workspace_id: uuid.UUID | None,
+        project_id: uuid.UUID,
+    ) -> str | None:
+        member = await self._ensure_membership(user_id, workspace_id)
+        assert workspace_id is not None
+        project = await self.repository.get_project(workspace_id, project_id)
+        if project is None:
+            raise ProjectNotFound("Project not found")
+        self._ensure_mutation_allowed(member)
+        return await self.repository.get_active_release_key_prefix(workspace_id, project_id)
+
+    async def create_release_key(
+        self,
+        user_id: uuid.UUID,
+        workspace_id: uuid.UUID | None,
+        project_id: uuid.UUID,
+        *,
+        rotate: bool = False,
+    ) -> tuple[ProjectApiKey, str]:
+        async with self.session.begin():
+            member = await self._ensure_membership(user_id, workspace_id)
+            assert workspace_id is not None
+
+            project = await self.repository.get_project_for_update(workspace_id, project_id)
+            if project is None:
+                raise ProjectNotFound("Project not found")
+            self._ensure_mutation_allowed(member)
+
+            prefix = await self.repository.get_active_release_key_prefix(workspace_id, project_id)
+            if rotate:
+                if prefix is None:
+                    raise ApiKeyNotFound("No active release key")
+                await self.repository.revoke_active_release_keys(
+                    workspace_id, project_id, datetime.now(timezone.utc)
+                )
+            elif prefix is not None:
+                raise ReleaseKeyAlreadyExists("An active release key already exists")
+
+            token = f"fl_release_{secrets.token_urlsafe(32)}"
+            key = await self.repository.create_api_key(
+                ProjectApiKey(
+                    workspace_id=workspace_id,
+                    project_id=project_id,
+                    key_type="release",
+                    key_hash=sha256(token.encode("ascii")).hexdigest(),
+                    key_prefix=token[:16],
+                    created_by=user_id,
+                )
+            )
+
+        return key, token
+
+    async def register_release(
+        self, token: str, project_id: uuid.UUID, payload: ReleaseCreateRequest
+    ) -> tuple[Release, bool]:
+        key_hash = sha256(token.encode("utf-8")).hexdigest()
+        async with self.session.begin():
+            key = await self.repository.get_active_release_key_by_hash(key_hash)
+            if key is None:
+                raise InvalidReleaseKey("Missing or invalid credentials")
+            if key.project_id != project_id:
+                raise ProjectNotFound("Project not found")
+
+            workspace_id = key.workspace_id
+            # Release registration and key rotation acquire the same project lock.
+            project = await self.repository.get_project_for_update(workspace_id, project_id)
+            if project is None:
+                raise ProjectNotFound("Project not found")
+            key = await self.repository.get_active_release_key_by_hash(key_hash)
+            if key is None:
+                raise InvalidReleaseKey("Missing or invalid credentials")
+
+            release = await self.repository.get_release(workspace_id, project_id, payload.version)
+            if release is not None:
+                if (release.commit_sha, release.artifact_ref) != (payload.commit_sha, payload.artifact_ref):
+                    raise ReleaseVersionConflict("Release version already has different metadata")
+                return release, False
+
+            release = await self.repository.create_release(
+                Release(
+                    workspace_id=workspace_id,
+                    project_id=project_id,
+                    version=payload.version,
+                    commit_sha=payload.commit_sha,
+                    artifact_ref=payload.artifact_ref,
+                    created_by_key_id=key.id,
+                )
+            )
+            return release, True
+
+    async def list_releases(
+        self, user_id: uuid.UUID, workspace_id: uuid.UUID | None, project_id: uuid.UUID
+    ) -> tuple[Sequence[Release], Sequence[Deployment]]:
+        project = await self.get_project(user_id, workspace_id, project_id)
+        releases = await self.repository.list_releases(project.workspace_id, project.id)
+        deployments = (
+            await self.repository.list_deployments(project.workspace_id, project.id)
+            if releases
+            else []
+        )
+        return releases, deployments

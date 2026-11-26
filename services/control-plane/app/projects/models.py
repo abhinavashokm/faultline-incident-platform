@@ -13,7 +13,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -192,3 +192,112 @@ class ProjectSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()"), nullable=False
     )
+
+
+class Release(Base):
+    __tablename__ = "releases"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id"],
+            [f"{SCHEMA}.projects.workspace_id", f"{SCHEMA}.projects.id"],
+            name="releases_project_fk",
+        ),
+        ForeignKeyConstraint(
+            ["created_by_key_id"],
+            [f"{SCHEMA}.project_api_keys.id"],
+            name="releases_created_by_key_fk",
+        ),
+        UniqueConstraint("project_id", "version", name="releases_project_version_uq"),
+        UniqueConstraint("workspace_id", "project_id", "id", name="releases_workspace_project_id_uq"),
+        Index("releases_project_created_at_idx", "project_id", "created_at"),
+        Index("releases_project_commit_sha_idx", "project_id", "commit_sha"),
+        CheckConstraint("version <> '' AND version !~ '[[:space:]]'", name="releases_version_ck"),
+        CheckConstraint("commit_sha ~ '^[0-9a-f]+$'", name="releases_commit_sha_ck"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    version: Mapped[str] = mapped_column(String(150))
+    commit_sha: Mapped[str | None] = mapped_column(String(64))
+    artifact_ref: Mapped[str | None] = mapped_column(String(300))
+    created_by_key_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class Deployment(Base):
+    __tablename__ = "deployments"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id"],
+            [f"{SCHEMA}.projects.workspace_id", f"{SCHEMA}.projects.id"],
+            name="deployments_project_fk",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "project_id", "release_id"],
+            [f"{SCHEMA}.releases.workspace_id", f"{SCHEMA}.releases.project_id", f"{SCHEMA}.releases.id"],
+            name="deployments_release_fk",
+        ),
+        ForeignKeyConstraint(
+            ["rollback_of_deployment_id"],
+            [f"{SCHEMA}.deployments.id"],
+            name="deployments_rollback_of_fk",
+        ),
+        ForeignKeyConstraint(
+            ["deployed_by"],
+            [f"{SCHEMA}.users.id"],
+            name="deployments_deployed_by_fk",
+        ),
+        ForeignKeyConstraint(
+            ["deployed_by_key_id"],
+            [f"{SCHEMA}.project_api_keys.id"],
+            name="deployments_deployed_by_key_fk",
+        ),
+        Index("deployments_project_environment_created_at_idx", "project_id", "environment", "created_at"),
+        UniqueConstraint("project_id", "external_run_id", name="deployments_project_external_run_uq"),
+        Index(
+            "deployments_project_environment_active_uq",
+            "project_id",
+            "environment",
+            unique=True,
+            postgresql_where=text("status IN ('pending', 'running')"),
+        ),
+        CheckConstraint("environment ~ '^[a-z0-9_-]+$'", name="deployments_environment_ck"),
+        CheckConstraint("kind IN ('deploy', 'rollback')", name="deployments_kind_ck"),
+        CheckConstraint(
+            "status IN ('pending', 'running', 'success', 'failed', 'cancelled', 'rolled_back')",
+            name="deployments_status_ck",
+        ),
+        CheckConstraint(
+            "(deployed_by IS NULL) <> (deployed_by_key_id IS NULL)",
+            name="deployments_actor_ck",
+        ),
+        CheckConstraint("finished_at >= started_at", name="deployments_finished_at_ck"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    workspace_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    release_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    environment: Mapped[str] = mapped_column(String(100))
+    kind: Mapped[str] = mapped_column(String(20), server_default="deploy")
+    status: Mapped[str] = mapped_column(String(30), server_default="pending")
+    rollback_of_deployment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    external_run_id: Mapped[str | None] = mapped_column(String(100))
+    deployed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    deployed_by_key_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    failure_reason: Mapped[str | None] = mapped_column(String(500))
+    deployment_metadata: Mapped[dict[str, object] | None] = mapped_column("metadata", JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -1,7 +1,9 @@
 import uuid
+from collections import defaultdict
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import AuthContext, current_user
@@ -14,16 +16,26 @@ from app.projects.schemas import (
     ProjectSettingsResponse,
     ProjectSettingsUpdateRequest,
     ProjectUpdateRequest,
+    ReleaseCreateRequest,
+    ReleaseCreateResponse,
+    ReleaseDeploymentResponse,
+    ReleaseKeyCreateResponse,
+    ReleaseKeyStatusResponse,
+    ReleaseListItem,
 )
 from app.projects.service import (
     ApiKeyNotFound,
     DuplicateSlugError,
     InsufficientPermissions,
+    InvalidReleaseKey,
     ProjectNotFound,
     ProjectService,
+    ReleaseKeyAlreadyExists,
+    ReleaseVersionConflict,
 )
 
 router = APIRouter()
+release_key_bearer = HTTPBearer(auto_error=False, scheme_name="ReleaseKeyBearer")
 
 
 @router.get(
@@ -344,3 +356,145 @@ async def rotate_project_api_key(
             detail="Project not found",
         ) from exc
 
+
+@router.get("/{project_id}/release-keys", response_model=ReleaseKeyStatusResponse)
+async def get_project_release_key(
+    project_id: uuid.UUID,
+    user: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReleaseKeyStatusResponse:
+    try:
+        prefix = await ProjectService(session).get_release_key_prefix(
+            user.user_id, user.workspace_id, project_id
+        )
+    except InsufficientPermissions as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except ProjectNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return ReleaseKeyStatusResponse(key_prefix=prefix)
+
+
+@router.post(
+    "/{project_id}/release-keys",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ReleaseKeyCreateResponse,
+    description="Generate the first active release key and return its full token once.",
+)
+async def create_project_release_key(
+    project_id: uuid.UUID,
+    response: Response,
+    user: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReleaseKeyCreateResponse:
+    return await _replace_project_release_key(project_id, response, user, session, rotate=False)
+
+
+@router.post(
+    "/{project_id}/release-keys/rotate",
+    response_model=ReleaseKeyCreateResponse,
+    description="Revoke all active release keys and return a replacement token once.",
+)
+async def rotate_project_release_key(
+    project_id: uuid.UUID,
+    response: Response,
+    user: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReleaseKeyCreateResponse:
+    return await _replace_project_release_key(project_id, response, user, session, rotate=True)
+
+
+async def _replace_project_release_key(
+    project_id: uuid.UUID,
+    response: Response,
+    user: AuthContext,
+    session: AsyncSession,
+    *,
+    rotate: bool,
+) -> ReleaseKeyCreateResponse:
+    try:
+        key, token = await ProjectService(session).create_release_key(
+            user_id=user.user_id,
+            workspace_id=user.workspace_id,
+            project_id=project_id,
+            rotate=rotate,
+        )
+    except InsufficientPermissions as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except (ProjectNotFound, ApiKeyNotFound) as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ReleaseKeyAlreadyExists as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    assert key.key_prefix is not None
+    response.headers["Cache-Control"] = "no-store"
+    return ReleaseKeyCreateResponse(id=key.id, key_prefix=key.key_prefix, token=token)
+
+
+@router.post(
+    "/{project_id}/releases",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ReleaseCreateResponse,
+    responses={
+        200: {"model": ReleaseCreateResponse, "description": "Existing release returned"},
+        401: {"description": "Missing or invalid release token"},
+        404: {"description": "Project not found"},
+        409: {"description": "Release version already has different metadata"},
+    },
+)
+async def create_project_release(
+    project_id: uuid.UUID,
+    payload: ReleaseCreateRequest,
+    response: Response,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(release_key_bearer)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReleaseCreateResponse:
+    try:
+        if credentials is None:
+            raise InvalidReleaseKey("Missing or invalid credentials")
+        release, created = await ProjectService(session).register_release(
+            credentials.credentials, project_id, payload
+        )
+    except InvalidReleaseKey as exc:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail=str(exc), headers={"WWW-Authenticate": "Bearer"}
+        ) from exc
+    except ProjectNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ReleaseVersionConflict as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return ReleaseCreateResponse(id=release.id, version=release.version, commit_sha=release.commit_sha)
+
+
+@router.get("/{project_id}/releases", response_model=list[ReleaseListItem])
+async def list_project_releases(
+    project_id: uuid.UUID,
+    user: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> list[ReleaseListItem]:
+    try:
+        releases, deployments = await ProjectService(session).list_releases(
+            user.user_id, user.workspace_id, project_id
+        )
+    except ProjectNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found") from exc
+
+    deployments_by_release: dict[uuid.UUID, list[ReleaseDeploymentResponse]] = defaultdict(list)
+    for deployment in deployments:
+        deployments_by_release[deployment.release_id].append(
+            ReleaseDeploymentResponse.model_validate(deployment)
+        )
+
+    return [
+        ReleaseListItem(
+            id=release.id,
+            version=release.version,
+            commit_sha=release.commit_sha,
+            artifact_ref=release.artifact_ref,
+            created_at=release.created_at,
+            deployments=deployments_by_release[release.id],
+        )
+        for release in releases
+    ]

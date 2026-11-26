@@ -12,6 +12,7 @@ import {
   SearchCode,
   X,
   Server,
+  Package,
 } from "lucide-react";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,11 @@ export function Sidebar({
       name: "Performance",
       href: `${basePrefix}/performance`,
       icon: Gauge,
+    },
+    {
+      name: "Releases",
+      href: currentProjectSlug ? `${basePrefix}/releases` : `/${workspaceSlug}/projects`,
+      icon: Package,
     },
     {
       name: "Alerts",
