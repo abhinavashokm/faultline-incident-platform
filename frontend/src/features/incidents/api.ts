@@ -55,3 +55,7 @@ export function getIncident(projectId: string, incidentId: string, signal: Abort
     { signal },
   );
 }
+
+export function deleteIncident(projectId: string, incidentId: string) {
+  return apiClient.delete(`/api/v1/projects/${projectId}/incidents/${encodeURIComponent(incidentId)}`);
+}

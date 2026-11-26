@@ -88,6 +88,19 @@ class IncidentService:
             timeline=[TimelineEntry.model_validate(entry) for entry in timeline],
         )
 
+    async def delete_incident(
+        self, project_id: UUID, incident_id: UUID, principal: Principal, token: str
+    ) -> None:
+        await self._verify_project(project_id, token)
+        async with self.session.begin():
+            incident = await self.repository.get_for_project(
+                principal.workspace_id, project_id, incident_id, for_update=True
+            )
+            if incident is None:
+                raise HTTPException(404, "Incident not found")
+
+            await self.repository.delete_incident(incident)
+
     async def create(
         self, project_id: UUID, payload: CreateIncidentRequest, principal: Principal, token: str
     ) -> CreatedIncident:

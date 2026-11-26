@@ -6,6 +6,11 @@
   `assignee_id`, and `started_at`.
 - `POST /api/v1/projects/{project_id}/incidents` creates an incident in the
   active workspace and returns its ID, title, severity, and status.
+- `DELETE /api/v1/projects/{project_id}/incidents/{incident_id}` permanently
+  removes the incident, its timeline entries, and its issue links in one
+  transaction. The linked issues stay in Processing. Requires a Bearer access
+  token and returns `204 No Content` on success or `404 Not Found` if the
+  incident is missing or outside the authorized project and workspace.
 
 Creation requires a Bearer access token, a title, and a severity. The request
 can include a description, related issue IDs, and the caller's own user ID

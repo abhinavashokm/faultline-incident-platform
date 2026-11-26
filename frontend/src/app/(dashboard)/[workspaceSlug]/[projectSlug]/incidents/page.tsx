@@ -1,15 +1,17 @@
 "use client";
 
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import Link from "next/link";
 import { ClipboardList, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { incidentsQueryKey, listIncidents } from "@/features/incidents/api";
+import { toast } from "@/components/ui/use-toast";
+import { deleteIncident, incidentsQueryKey, listIncidents } from "@/features/incidents/api";
 import { useProjectBySlug } from "@/features/projects/hooks";
 
 const startedDate = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -27,6 +29,23 @@ export default function IncidentsPage({
     queryFn: projectId ? () => listIncidents(projectId) : skipToken,
   });
 
+  const queryClient = useQueryClient();
+  const [incidentToDelete, setIncidentToDelete] = useState<{ projectId: string; id: string; title: string }>();
+  const deleteTarget = incidentToDelete?.projectId === projectId ? incidentToDelete : undefined;
+  const deletion = useMutation({
+    mutationFn: (target: NonNullable<typeof incidentToDelete>) => deleteIncident(target.projectId, target.id),
+    onSuccess: async (_, target) => {
+      const listKey = incidentsQueryKey(target.projectId);
+      await queryClient.cancelQueries({ queryKey: listKey, exact: true });
+      queryClient.setQueryData<Awaited<ReturnType<typeof listIncidents>>>(listKey, (items) =>
+        items?.filter((incident) => incident.id !== target.id),
+      );
+      queryClient.removeQueries({ queryKey: ["incident-detail", target.projectId, target.id], exact: true });
+      void queryClient.invalidateQueries({ queryKey: listKey, exact: true });
+      setIncidentToDelete(undefined);
+      toast({ title: "Incident deleted", variant: "success" });
+    },
+  });
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [severity, setSeverity] = useState("");
@@ -173,11 +192,21 @@ export default function IncidentsPage({
                             <Pencil className="h-4 w-4" aria-hidden="true" />
                           </Button>
                         </span>
-                        <span title="Incident deletion is unavailable">
-                          <Button type="button" size="icon" variant="ghost" className="text-text-secondary" disabled aria-label={`Delete ${incident.title}`}>
-                            <Trash2 className="h-4 w-4" aria-hidden="true" />
-                          </Button>
-                        </span>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="text-text-secondary hover:bg-destructive-container hover:text-error-foreground"
+                          aria-label={`Delete ${incident.title}`}
+                          title="Delete incident"
+                          onClick={() => {
+                            if (!projectId) return;
+                            deletion.reset();
+                            setIncidentToDelete({ projectId, id: incident.id, title: incident.title });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -187,6 +216,20 @@ export default function IncidentsPage({
           </div>
         )}
       </section>
+      {deleteTarget && (
+        <ConfirmationDialog
+          title="Delete incident?"
+          confirmLabel={deletion.isPending ? "Deleting…" : "Delete incident"}
+          pending={deletion.isPending}
+          onCancel={() => setIncidentToDelete(undefined)}
+          onConfirm={() => deletion.mutate(deleteTarget)}
+        >
+          <p className="break-words">
+            Permanently delete <strong>{deleteTarget.title}</strong>, its timeline, and its issue links?
+          </p>
+          {deletion.isError && <p role="alert" className="mt-3 text-error">{deletion.error.message}</p>}
+        </ConfirmationDialog>
+      )}
     </div>
   );
 }

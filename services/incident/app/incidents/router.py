@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials
 from faultline_auth import Principal, get_principal, http_bearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,3 +64,22 @@ async def get_incident(
         session, request.app.state.http_client, request.app.state.settings
     )
     return await service.get_detail(project_id, incident_id, principal, credentials.credentials)
+
+
+@router.delete(
+    "/projects/{project_id}/incidents/{incident_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_incident(
+    project_id: UUID,
+    incident_id: UUID,
+    request: Request,
+    principal: Annotated[Principal, Depends(get_principal)],
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(http_bearer)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    service = IncidentService(
+        session, request.app.state.http_client, request.app.state.settings
+    )
+    await service.delete_incident(project_id, incident_id, principal, credentials.credentials)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
