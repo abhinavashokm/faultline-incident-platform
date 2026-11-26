@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { createIncident, incidentsQueryKey, type IncidentSeverity } from "@/features/incidents/api";
+import { IssuePicker } from "@/features/incidents/issue-picker";
+import type { IssueListItem } from "@/features/issues/types";
 import { useProjectBySlug } from "@/features/projects/hooks";
 
 const severities: { value: IncidentSeverity; label: string }[] = [
@@ -33,6 +35,10 @@ export default function CreateIncidentPage({
   const [title, setTitle] = useState("");
   const [severity, setSeverity] = useState<IncidentSeverity>("medium");
   const [description, setDescription] = useState("");
+  const [issueSelection, setIssueSelection] = useState<{ projectId: string; issues: IssueListItem[] }>();
+  const selectedIssues = issueSelection && issueSelection.projectId === project?.id
+    ? issueSelection.issues
+    : [];
 
   const creation = useMutation({
     mutationFn: (projectId: string) =>
@@ -40,6 +46,7 @@ export default function CreateIncidentPage({
         title: title.trim(),
         severity,
         description: description.trim() || undefined,
+        relatedIssueIds: selectedIssues.length ? selectedIssues.map((issue) => issue.id) : undefined,
       }),
     retry: false,
     onSuccess: (incident, projectId) => {
@@ -113,6 +120,12 @@ export default function CreateIncidentPage({
                 className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
               />
             </div>
+            <IssuePicker
+              key={project.id}
+              projectId={project.id}
+              selected={selectedIssues}
+              onChange={(issues) => setIssueSelection({ projectId: project.id, issues })}
+            />
             {creation.isError && (
               <p role="alert" className="text-sm text-error">
                 {creation.error instanceof Error ? creation.error.message : "Couldn’t create the incident."}

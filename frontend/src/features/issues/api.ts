@@ -10,7 +10,8 @@ import {
 
 export async function listIssuesApi(
   projectId: string,
-  filters: IssueFilterParams = {}
+  filters: IssueFilterParams = {},
+  signal?: AbortSignal
 ): Promise<IssueListResponse> {
   const params: Record<string, string | number | undefined> = {};
 
@@ -23,9 +24,13 @@ export async function listIssuesApi(
   if (filters.cursor) {
     params.cursor = filters.cursor;
   }
+  if (filters.search) {
+    params.search = filters.search;
+  }
 
   return apiClient.get<IssueListResponse>(`/api/v1/projects/${projectId}/issues`, {
     params,
+    signal,
   });
 }
 

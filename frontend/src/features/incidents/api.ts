@@ -6,6 +6,7 @@ type CreateIncidentPayload = {
   title: string;
   severity: IncidentSeverity;
   description?: string;
+  relatedIssueIds?: string[];
 };
 
 type CreatedIncident = {

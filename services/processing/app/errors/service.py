@@ -243,6 +243,7 @@ class ErrorsHttpService:
         status_filter: str | None,
         limit: int,
         cursor_str: str | None,
+        search: str | None = None,
     ) -> PaginatedResponse[IssueListItem]:
         cursor = decode_issue_cursor(cursor_str) if cursor_str else None
         rows = await self.repo.list_issues(
@@ -251,6 +252,7 @@ class ErrorsHttpService:
             status=status_filter,
             limit=limit,
             cursor=cursor,
+            search=search.strip() if search else None,
         )
 
         has_more = len(rows) > limit
