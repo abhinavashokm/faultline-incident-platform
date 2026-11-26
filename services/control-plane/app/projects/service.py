@@ -3,6 +3,7 @@ import secrets
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from hashlib import sha256
 from typing import Any
 
 from sqlalchemy.exc import IntegrityError
@@ -312,3 +313,31 @@ class ProjectService:
         dsn = self._build_dsn(new_project_api_key)
         return new_key, dsn
 
+    async def create_release_key(
+        self,
+        user_id: uuid.UUID,
+        workspace_id: uuid.UUID | None,
+        project_id: uuid.UUID,
+    ) -> tuple[ProjectApiKey, str]:
+        async with self.session.begin():
+            member = await self._ensure_membership(user_id, workspace_id)
+            assert workspace_id is not None
+
+            project = await self.repository.get_project_for_update(workspace_id, project_id)
+            if project is None:
+                raise ProjectNotFound("Project not found")
+            self._ensure_mutation_allowed(member)
+
+            token = f"fl_release_{secrets.token_urlsafe(32)}"
+            key = await self.repository.create_api_key(
+                ProjectApiKey(
+                    workspace_id=workspace_id,
+                    project_id=project_id,
+                    key_type="release",
+                    key_hash=sha256(token.encode("ascii")).hexdigest(),
+                    key_prefix=token[:16],
+                    created_by=user_id,
+                )
+            )
+
+        return key, token

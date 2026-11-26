@@ -51,3 +51,7 @@ export async function checkFirstEventStatusApi(
     status: "waiting",
   };
 }
+
+export async function createReleaseKeyApi(projectId: string): Promise<{ token: string }> {
+  return apiClient.post<{ token: string }>(`/api/v1/projects/${projectId}/release-keys`);
+}

@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { ProjectDsn } from "./project-dsn";
+import { ProjectReleaseKey } from "./project-release-key";
 import { useListProjects } from "../hooks";
 import { PLATFORM_REGISTRY } from "../platform-registry";
 
@@ -19,6 +20,7 @@ export function ProjectDetail({ workspaceSlug, slug }: { workspaceSlug: string; 
   const role = currentUser?.memberships?.find(
     (membership) => membership.workspace_id === currentUser.workspace?.id
   )?.role;
+  const canManageKeys = role === "owner" || role === "admin";
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -80,7 +82,8 @@ export function ProjectDetail({ workspaceSlug, slug }: { workspaceSlug: string; 
               </dd>
             </div>
           </dl>
-          <ProjectDsn key={project.id} projectId={project.id} canRotate={role === "owner" || role === "admin"} />
+          <ProjectDsn key={project.id} projectId={project.id} canRotate={canManageKeys} />
+          {canManageKeys && <ProjectReleaseKey key={`release-${project.id}`} projectId={project.id} />}
           <div className="flex flex-wrap gap-2 border-t border-border px-6 py-4">
             <Button asChild>
               <Link href={`/${workspaceSlug}/${project.slug}/overview`}>Open project</Link>

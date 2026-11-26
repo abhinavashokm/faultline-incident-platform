@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import AuthContext, current_user
@@ -14,6 +14,7 @@ from app.projects.schemas import (
     ProjectSettingsResponse,
     ProjectSettingsUpdateRequest,
     ProjectUpdateRequest,
+    ReleaseKeyCreateResponse,
 )
 from app.projects.service import (
     ApiKeyNotFound,
@@ -344,3 +345,36 @@ async def rotate_project_api_key(
             detail="Project not found",
         ) from exc
 
+
+@router.post(
+    "/{project_id}/release-keys",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ReleaseKeyCreateResponse,
+    description="Generate a project release key and return its full token once.",
+)
+async def create_project_release_key(
+    project_id: uuid.UUID,
+    response: Response,
+    user: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReleaseKeyCreateResponse:
+    try:
+        key, token = await ProjectService(session).create_release_key(
+            user_id=user.user_id,
+            workspace_id=user.workspace_id,
+            project_id=project_id,
+        )
+    except InsufficientPermissions as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        ) from exc
+    except ProjectNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        ) from exc
+
+    assert key.key_prefix is not None
+    response.headers["Cache-Control"] = "no-store"
+    return ReleaseKeyCreateResponse(id=key.id, key_prefix=key.key_prefix, token=token)
