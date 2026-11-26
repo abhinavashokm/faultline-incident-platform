@@ -35,12 +35,25 @@ export default function IncidentDetailPage({
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <Button variant="ghost" size="sm" className="-ml-2 gap-2" asChild>
-        <Link href={`${projectHref}/incidents`}>
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back to incidents
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-label-md text-text-secondary">
+        <Link
+          href={`${projectHref}/incidents`}
+          className="inline-flex shrink-0 items-center gap-1 transition-colors hover:text-text-primary"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>Incidents</span>
         </Link>
-      </Button>
+        <span className="text-text-muted" aria-hidden="true">/</span>
+        {incident && (
+          <>
+            <span className="shrink-0 font-mono text-text-muted">{incident.id.slice(0, 8)}</span>
+            <span className="text-text-muted" aria-hidden="true">/</span>
+          </>
+        )}
+        <span aria-current="page" className="truncate font-semibold text-text-primary">
+          {incident?.title ?? "Incident details"}
+        </span>
+      </nav>
 
       {projectQuery.isLoading || detail.isLoading ? (
         <p role="status" className="text-sm text-muted-foreground">Loading incident…</p>
