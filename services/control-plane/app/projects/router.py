@@ -15,6 +15,7 @@ from app.projects.schemas import (
     ProjectSettingsUpdateRequest,
     ProjectUpdateRequest,
     ReleaseKeyCreateResponse,
+    ReleaseKeyStatusResponse,
 )
 from app.projects.service import (
     ApiKeyNotFound,
@@ -22,6 +23,7 @@ from app.projects.service import (
     InsufficientPermissions,
     ProjectNotFound,
     ProjectService,
+    ReleaseKeyAlreadyExists,
 )
 
 router = APIRouter()
@@ -346,11 +348,28 @@ async def rotate_project_api_key(
         ) from exc
 
 
+@router.get("/{project_id}/release-keys", response_model=ReleaseKeyStatusResponse)
+async def get_project_release_key(
+    project_id: uuid.UUID,
+    user: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReleaseKeyStatusResponse:
+    try:
+        prefix = await ProjectService(session).get_release_key_prefix(
+            user.user_id, user.workspace_id, project_id
+        )
+    except InsufficientPermissions as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except ProjectNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return ReleaseKeyStatusResponse(key_prefix=prefix)
+
+
 @router.post(
     "/{project_id}/release-keys",
     status_code=status.HTTP_201_CREATED,
     response_model=ReleaseKeyCreateResponse,
-    description="Generate a project release key and return its full token once.",
+    description="Generate the first active release key and return its full token once.",
 )
 async def create_project_release_key(
     project_id: uuid.UUID,
@@ -358,22 +377,44 @@ async def create_project_release_key(
     user: Annotated[AuthContext, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ReleaseKeyCreateResponse:
+    return await _replace_project_release_key(project_id, response, user, session, rotate=False)
+
+
+@router.post(
+    "/{project_id}/release-keys/rotate",
+    response_model=ReleaseKeyCreateResponse,
+    description="Revoke all active release keys and return a replacement token once.",
+)
+async def rotate_project_release_key(
+    project_id: uuid.UUID,
+    response: Response,
+    user: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReleaseKeyCreateResponse:
+    return await _replace_project_release_key(project_id, response, user, session, rotate=True)
+
+
+async def _replace_project_release_key(
+    project_id: uuid.UUID,
+    response: Response,
+    user: AuthContext,
+    session: AsyncSession,
+    *,
+    rotate: bool,
+) -> ReleaseKeyCreateResponse:
     try:
         key, token = await ProjectService(session).create_release_key(
             user_id=user.user_id,
             workspace_id=user.workspace_id,
             project_id=project_id,
+            rotate=rotate,
         )
     except InsufficientPermissions as exc:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions",
-        ) from exc
-    except ProjectNotFound as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        ) from exc
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except (ProjectNotFound, ApiKeyNotFound) as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ReleaseKeyAlreadyExists as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     assert key.key_prefix is not None
     response.headers["Cache-Control"] = "no-store"

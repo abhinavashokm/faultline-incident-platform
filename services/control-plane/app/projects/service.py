@@ -43,6 +43,10 @@ class ApiKeyNotFound(ProjectError):
     """Raised when an active API key is not found for the project."""
 
 
+class ReleaseKeyAlreadyExists(ProjectError):
+    """Raised when a project already has an active release key."""
+
+
 class ProjectService:
     """Service owning project business rules and database transactions."""
 
@@ -313,11 +317,27 @@ class ProjectService:
         dsn = self._build_dsn(new_project_api_key)
         return new_key, dsn
 
+    async def get_release_key_prefix(
+        self,
+        user_id: uuid.UUID,
+        workspace_id: uuid.UUID | None,
+        project_id: uuid.UUID,
+    ) -> str | None:
+        member = await self._ensure_membership(user_id, workspace_id)
+        assert workspace_id is not None
+        project = await self.repository.get_project(workspace_id, project_id)
+        if project is None:
+            raise ProjectNotFound("Project not found")
+        self._ensure_mutation_allowed(member)
+        return await self.repository.get_active_release_key_prefix(workspace_id, project_id)
+
     async def create_release_key(
         self,
         user_id: uuid.UUID,
         workspace_id: uuid.UUID | None,
         project_id: uuid.UUID,
+        *,
+        rotate: bool = False,
     ) -> tuple[ProjectApiKey, str]:
         async with self.session.begin():
             member = await self._ensure_membership(user_id, workspace_id)
@@ -327,6 +347,16 @@ class ProjectService:
             if project is None:
                 raise ProjectNotFound("Project not found")
             self._ensure_mutation_allowed(member)
+
+            prefix = await self.repository.get_active_release_key_prefix(workspace_id, project_id)
+            if rotate:
+                if prefix is None:
+                    raise ApiKeyNotFound("No active release key")
+                await self.repository.revoke_active_release_keys(
+                    workspace_id, project_id, datetime.now(timezone.utc)
+                )
+            elif prefix is not None:
+                raise ReleaseKeyAlreadyExists("An active release key already exists")
 
             token = f"fl_release_{secrets.token_urlsafe(32)}"
             key = await self.repository.create_api_key(

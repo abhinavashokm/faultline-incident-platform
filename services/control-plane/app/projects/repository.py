@@ -126,3 +126,33 @@ class ProjectRepository:
         result = await self.session.execute(stmt)
         return int(result.rowcount)  # type: ignore[attr-defined]
 
+
+    async def get_active_release_key_prefix(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> str | None:
+        query = (
+            select(ProjectApiKey.key_prefix)
+            .where(
+                ProjectApiKey.workspace_id == workspace_id,
+                ProjectApiKey.project_id == project_id,
+                ProjectApiKey.key_type == "release",
+                ProjectApiKey.revoked_at.is_(None),
+            )
+            .order_by(ProjectApiKey.created_at.desc(), ProjectApiKey.id.desc())
+            .limit(1)
+        )
+        return (await self.session.execute(query)).scalar_one_or_none()
+
+    async def revoke_active_release_keys(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID, revoked_at: datetime
+    ) -> None:
+        await self.session.execute(
+            update(ProjectApiKey)
+            .where(
+                ProjectApiKey.workspace_id == workspace_id,
+                ProjectApiKey.project_id == project_id,
+                ProjectApiKey.key_type == "release",
+                ProjectApiKey.revoked_at.is_(None),
+            )
+            .values(revoked_at=revoked_at)
+        )

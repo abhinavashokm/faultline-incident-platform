@@ -139,8 +139,11 @@ class ProjectApiKeyResponse(BaseModel):
     created_at: datetime
 
 
-
 class ReleaseKeyCreateResponse(BaseModel):
     id: uuid.UUID
     key_prefix: str
     token: str
+
+
+class ReleaseKeyStatusResponse(BaseModel):
+    key_prefix: str | None
