@@ -180,6 +180,8 @@ services:
       CONTROL_PLANE_DATABASE_URL: postgresql+asyncpg://faultline:faultline@postgres:5432/control_plane
       CONTROL_PLANE_SMTP_HOST: mailpit
       CONTROL_PLANE_SMTP_PORT: "1025"
+      CONTROL_PLANE_DSN_SCHEME: ${CONTROL_PLANE_DSN_SCHEME:-http}
+      CONTROL_PLANE_DSN_HOST: ${CONTROL_PLANE_DSN_HOST:-localhost:8000}
     depends_on:
       migrate:
         condition: service_completed_successfully

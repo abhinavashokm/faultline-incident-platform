@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.auth.security import create_access_token
+from app.core.config import settings as app_settings
 from app.projects.models import Project, ProjectApiKey, ProjectSettings
 from app.workspaces.models import Workspace, WorkspaceMember
 
@@ -77,9 +78,6 @@ async def test_create_project_success(
     assert data["description"] == "Backend for payment processing"
     assert data["status"] == "active"
     assert "id" in data
-    assert "dsn" in data
-    assert data["dsn"].startswith("https://")
-    assert f"@{data['id']}" in data["dsn"] or data["id"] in data["dsn"]
 
     project_id = uuid.UUID(data["id"])
 
@@ -107,6 +105,9 @@ async def test_create_project_success(
     keys = (await db_session.execute(k_stmt)).scalars().all()
     assert len(keys) == 1
     assert keys[0].public_key is not None
+    assert data["dsn"] == (
+        f"{app_settings.dsn_scheme}://{keys[0].public_key}@{app_settings.dsn_host}"
+    )
     assert keys[0].key_hash is None
     assert keys[0].key_prefix is None
 
