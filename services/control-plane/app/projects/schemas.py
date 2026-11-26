@@ -182,3 +182,22 @@ class ReleaseCreateResponse(BaseModel):
     id: uuid.UUID
     version: str
     commit_sha: str | None
+
+
+class ReleaseDeploymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    environment: str
+    kind: str
+    status: str
+    external_run_id: str | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
+class ReleaseListItem(ReleaseCreateResponse):
+    artifact_ref: str | None
+    created_at: datetime
+    deployments: list[ReleaseDeploymentResponse]

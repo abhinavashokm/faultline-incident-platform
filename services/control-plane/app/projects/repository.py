@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.projects.models import Project, ProjectApiKey, ProjectSettings, Release
+from app.projects.models import Deployment, Project, ProjectApiKey, ProjectSettings, Release
 
 
 class ProjectRepository:
@@ -180,3 +180,26 @@ class ProjectRepository:
         self.session.add(release)
         await self.session.flush()
         return release
+
+    async def list_releases(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> Sequence[Release]:
+        query = (
+            select(Release)
+            .where(Release.workspace_id == workspace_id, Release.project_id == project_id)
+            .order_by(Release.created_at.desc(), Release.id.desc())
+        )
+        return (await self.session.execute(query)).scalars().all()
+
+    async def list_deployments(
+        self, workspace_id: uuid.UUID, project_id: uuid.UUID
+    ) -> Sequence[Deployment]:
+        query = (
+            select(Deployment)
+            .where(
+                Deployment.workspace_id == workspace_id,
+                Deployment.project_id == project_id,
+            )
+            .order_by(Deployment.created_at.desc(), Deployment.id.desc())
+        )
+        return (await self.session.execute(query)).scalars().all()

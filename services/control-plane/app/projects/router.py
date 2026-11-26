@@ -1,4 +1,5 @@
 import uuid
+from collections import defaultdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -17,8 +18,10 @@ from app.projects.schemas import (
     ProjectUpdateRequest,
     ReleaseCreateRequest,
     ReleaseCreateResponse,
+    ReleaseDeploymentResponse,
     ReleaseKeyCreateResponse,
     ReleaseKeyStatusResponse,
+    ReleaseListItem,
 )
 from app.projects.service import (
     ApiKeyNotFound,
@@ -463,3 +466,35 @@ async def create_project_release(
     if not created:
         response.status_code = status.HTTP_200_OK
     return ReleaseCreateResponse(id=release.id, version=release.version, commit_sha=release.commit_sha)
+
+
+@router.get("/{project_id}/releases", response_model=list[ReleaseListItem])
+async def list_project_releases(
+    project_id: uuid.UUID,
+    user: Annotated[AuthContext, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> list[ReleaseListItem]:
+    try:
+        releases, deployments = await ProjectService(session).list_releases(
+            user.user_id, user.workspace_id, project_id
+        )
+    except ProjectNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Project not found") from exc
+
+    deployments_by_release: dict[uuid.UUID, list[ReleaseDeploymentResponse]] = defaultdict(list)
+    for deployment in deployments:
+        deployments_by_release[deployment.release_id].append(
+            ReleaseDeploymentResponse.model_validate(deployment)
+        )
+
+    return [
+        ReleaseListItem(
+            id=release.id,
+            version=release.version,
+            commit_sha=release.commit_sha,
+            artifact_ref=release.artifact_ref,
+            created_at=release.created_at,
+            deployments=deployments_by_release[release.id],
+        )
+        for release in releases
+    ]

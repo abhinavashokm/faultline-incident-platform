@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.projects.models import Project, ProjectApiKey, ProjectSettings, Release
+from app.projects.models import Deployment, Project, ProjectApiKey, ProjectSettings, Release
 from app.projects.repository import ProjectRepository
 from app.projects.schemas import (
     ProjectCreateRequest,
@@ -418,3 +418,15 @@ class ProjectService:
                 )
             )
             return release, True
+
+    async def list_releases(
+        self, user_id: uuid.UUID, workspace_id: uuid.UUID | None, project_id: uuid.UUID
+    ) -> tuple[Sequence[Release], Sequence[Deployment]]:
+        project = await self.get_project(user_id, workspace_id, project_id)
+        releases = await self.repository.list_releases(project.workspace_id, project.id)
+        deployments = (
+            await self.repository.list_deployments(project.workspace_id, project.id)
+            if releases
+            else []
+        )
+        return releases, deployments
