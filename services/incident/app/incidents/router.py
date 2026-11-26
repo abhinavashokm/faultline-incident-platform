@@ -13,6 +13,8 @@ from app.incidents.schemas import (
     IncidentDetail,
     IncidentListItem,
     UpdateIncidentDetailsRequest,
+    UpdateIncidentStatusRequest,
+    UpdatedIncidentStatus,
 )
 from app.incidents.service import IncidentService
 
@@ -105,3 +107,17 @@ async def delete_incident(
     )
     await service.delete_incident(project_id, incident_id, principal, credentials.credentials)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/incidents/{incident_id}/status", response_model=UpdatedIncidentStatus)
+async def update_incident_status(
+    incident_id: UUID,
+    payload: UpdateIncidentStatusRequest,
+    request: Request,
+    principal: Annotated[Principal, Depends(get_principal)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> UpdatedIncidentStatus:
+    service = IncidentService(
+        session, request.app.state.http_client, request.app.state.settings
+    )
+    return await service.update_status(incident_id, payload, principal)

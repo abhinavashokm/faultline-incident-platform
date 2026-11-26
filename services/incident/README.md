@@ -19,6 +19,11 @@
   transaction. The linked issues stay in Processing. Requires a Bearer access
   token and returns `204 No Content` on success or `404 Not Found` if the
   incident is missing or outside the authorized project and workspace.
+- `POST /api/v1/incidents/{incident_id}/status` accepts `status` and an optional
+  `note`. Transitions are `open → investigating → mitigated → resolved → open`.
+  Returns `200` with `id`, `status`, and `resolved_at`. Missing or out-of-workspace
+  incidents return `404`. Invalid transitions, including no-op requests, return
+  `409`. The status update and timeline entry are saved together.
 
 Creation requires a Bearer access token, a title, and a severity. The request
 can include a description, related issue IDs, and the caller's own user ID

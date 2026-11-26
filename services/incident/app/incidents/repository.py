@@ -30,6 +30,19 @@ class IncidentRepository:
             query = query.with_for_update()
         return await self.session.scalar(query)
 
+    async def get_for_workspace_for_update(
+        self, workspace_id: UUID, incident_id: UUID
+    ) -> Incident | None:
+        query = (
+            select(Incident)
+            .where(Incident.workspace_id == workspace_id, Incident.id == incident_id)
+            .with_for_update()
+        )
+        return await self.session.scalar(query)
+
+    def add_timeline_entry(self, entry: IncidentTimelineEntry) -> None:
+        self.session.add(entry)
+
     async def list_related_issues(self, incident_id: UUID) -> list[IncidentIssue]:
         query = (
             select(IncidentIssue)
@@ -69,5 +82,5 @@ class IncidentRepository:
     def add_creation_details(
         self, entry: IncidentTimelineEntry, issues: list[IncidentIssue]
     ) -> None:
-        self.session.add(entry)
+        self.add_timeline_entry(entry)
         self.session.add_all(issues)

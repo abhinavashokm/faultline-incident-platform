@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_serializer
@@ -47,6 +47,24 @@ def utc_isoformat(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.isoformat()
+
+
+IncidentStatus = Literal["open", "investigating", "mitigated", "resolved"]
+
+
+class UpdateIncidentStatusRequest(BaseModel):
+    status: IncidentStatus
+    note: str | None = None
+
+
+class UpdatedIncidentStatus(BaseModel):
+    id: UUID
+    status: IncidentStatus
+    resolved_at: datetime | None
+
+    @field_serializer("resolved_at")
+    def serialize_resolved_at(self, value: datetime | None) -> str | None:
+        return utc_isoformat(value) if value is not None else None
 
 
 class RelatedIssue(BaseModel):

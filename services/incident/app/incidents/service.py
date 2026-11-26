@@ -15,13 +15,31 @@ from app.incidents.schemas import (
     CreateIncidentRequest,
     IncidentDetail,
     IncidentListItem,
+    IncidentStatus,
     IssueSnapshot,
     RelatedIssue,
     TimelineEntry,
     UpdateIncidentDetailsRequest,
+    UpdateIncidentStatusRequest,
+    UpdatedIncidentStatus,
 )
 
 logger = logging.getLogger(__name__)
+
+
+_NEXT_STATUS: dict[str, IncidentStatus] = {
+    "open": "investigating",
+    "investigating": "mitigated",
+    "mitigated": "resolved",
+    "resolved": "open",
+}
+
+
+def validate_status_transition(current: str, target: IncidentStatus) -> None:
+    if current == target:
+        raise HTTPException(409, f"Incident is already {target}.")
+    if _NEXT_STATUS.get(current) != target:
+        raise HTTPException(409, f"Cannot move incident from {current} to {target}.")
 
 
 def as_utc_naive(value: datetime) -> datetime:
@@ -121,6 +139,49 @@ class IncidentService:
             related_issues=[RelatedIssue.model_validate(issue) for issue in issues],
             timeline=[TimelineEntry.model_validate(entry) for entry in timeline],
         )
+
+    async def update_status(
+        self, incident_id: UUID, payload: UpdateIncidentStatusRequest, principal: Principal
+    ) -> UpdatedIncidentStatus:
+        async with self.session.begin():
+            incident = await self.repository.get_for_workspace_for_update(
+                principal.workspace_id, incident_id
+            )
+            if incident is None:
+                raise HTTPException(404, "Incident not found")
+
+            old_status = incident.status
+            new_status = payload.status
+            validate_status_transition(old_status, new_status)
+
+            now = as_utc_naive(datetime.now(timezone.utc))
+            incident.status = new_status
+            incident.updated_at = now
+            if new_status == "resolved":
+                incident.resolved_at = now
+            elif new_status == "open":
+                incident.resolved_at = None
+
+            message = f"Status changed from {old_status} to {new_status}."
+            if payload.note:
+                message = f"{message} {payload.note}"
+            self.repository.add_timeline_entry(
+                IncidentTimelineEntry(
+                    incident_id=incident.id,
+                    actor_id=principal.user_id,
+                    event_type="incident_status_changed",
+                    message=message,
+                    event_metadata={
+                        "old_status": old_status,
+                        "new_status": new_status,
+                        "note": payload.note,
+                    },
+                    created_at=now,
+                )
+            )
+            return UpdatedIncidentStatus(
+                id=incident.id, status=new_status, resolved_at=incident.resolved_at
+            )
 
     async def update_details(
         self,

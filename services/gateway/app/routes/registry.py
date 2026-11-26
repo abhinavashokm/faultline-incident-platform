@@ -84,7 +84,7 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
     - Alerting: /api/v1/projects/{project_id}/alerts
 
     Configurable routes:
-    - Incident: /api/v1/projects/{project_id}/incidents
+    - Incident: /api/v1/projects/{project_id}/incidents, /api/v1/incidents/{incident_id}/status
     - Investigation: /api/v1/projects/{project_id}/investigations
     """
     routes: list[RouteEntry] = [
@@ -164,6 +164,14 @@ def create_registry_from_settings(settings: Settings) -> RouteRegistry:
         routes.append(
             RouteEntry(
                 path_prefix="/api/v1/projects/{project_id}/incidents",
+                upstream_base_url=settings.upstream_incident_url,
+                service_name="incident",
+            )
+        )
+
+        routes.append(
+            RouteEntry(
+                path_prefix="/api/v1/incidents/{incident_id}/status",
                 upstream_base_url=settings.upstream_incident_url,
                 service_name="incident",
             )
