@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -40,6 +42,9 @@ interface CreateAlertRuleFormProps {
 }
 
 export function CreateAlertRuleForm({ projectId, channels }: CreateAlertRuleFormProps) {
+  const { workspaceSlug, projectSlug } = useParams<{ workspaceSlug: string; projectSlug: string }>();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -61,7 +66,6 @@ export function CreateAlertRuleForm({ projectId, channels }: CreateAlertRuleForm
     handleSubmit,
     control,
     watch,
-    reset,
     formState: { errors, isValid },
   } = form;
 
@@ -105,14 +109,8 @@ export function CreateAlertRuleForm({ projectId, channels }: CreateAlertRuleForm
         variant: "success",
       });
 
-      // Reset form on success without redirecting
-      reset({
-        name: "",
-        rule_type: "new_issue",
-        channel_ids: [],
-        environment: "",
-        severity: "warning",
-      });
+      void queryClient.invalidateQueries({ queryKey: ["alert-rules", projectId, workspaceSlug] });
+      router.replace(`/${workspaceSlug}/${projectSlug}/alerts/rules`);
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to create alert rule";
