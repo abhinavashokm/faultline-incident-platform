@@ -8,13 +8,6 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { NotificationChannel } from "../types";
 import type { UpdateWebhookChannelPayload } from "../api/alertRulesApi";
 
@@ -48,6 +41,13 @@ const webhookSchema = z.object({
 });
 
 type WebhookFormData = z.infer<typeof webhookSchema>;
+
+const authOptions: { value: WebhookFormData["auth"]["type"]; label: string }[] = [
+  { value: "keep", label: "Keep saved authentication" },
+  { value: "none", label: "None" },
+  { value: "bearer", label: "Bearer token" },
+  { value: "header", label: "Custom header" },
+];
 
 const SecretInput = forwardRef<HTMLInputElement, ComponentProps<typeof Input>>(
   function SecretInput({ id, disabled, ...props }, ref) {
@@ -105,7 +105,8 @@ export function WebhookChannelForm({
     register,
     watch,
     resetField,
-    setValue,
+    setError,
+    clearErrors,
     handleSubmit,
     getFieldState,
     formState,
@@ -121,6 +122,8 @@ export function WebhookChannelForm({
   });
   const { errors, isSubmitting } = formState;
   const authType = watch("auth.type");
+  const destinationChanged = !!editingChannel && watch("url").trim() !== editingChannel.destination;
+  const authChoiceError = getFieldState("auth.type", formState).error;
   const headerNameError = getFieldState("auth.name", formState).error;
   const authValueError = getFieldState("auth.value", formState).error;
 
@@ -128,13 +131,19 @@ export function WebhookChannelForm({
     <form
       id={formId}
       noValidate
-      onSubmit={handleSubmit(({ name, url, enabled, auth }) => onSave({
-        name,
-        channel_type: "webhook",
-        destination: url,
-        enabled,
-        ...(auth.type === "keep" ? {} : { auth: auth.type === "none" ? null : auth }),
-      }))}
+      onSubmit={handleSubmit(async ({ name, url, enabled, auth }) => {
+        if (editingChannel && url !== editingChannel.destination && auth.type === "keep") {
+          setError("auth.type", { message: "Choose None, Bearer token, or Custom header for the new URL." }, { shouldFocus: true });
+          return;
+        }
+        await onSave({
+          name,
+          channel_type: "webhook",
+          destination: url,
+          enabled,
+          ...(auth.type === "keep" ? {} : { auth: auth.type === "none" ? null : auth }),
+        });
+      })}
     >
       <fieldset disabled={isSubmitting} className="min-w-0 space-y-4">
         <div className="space-y-1.5">
@@ -159,7 +168,7 @@ export function WebhookChannelForm({
             required
             aria-invalid={!!errors.url}
             aria-describedby={errors.url ? "webhook-url-help webhook-url-error" : "webhook-url-help"}
-            {...register("url")}
+            {...register("url", { onChange: () => clearErrors("auth.type") })}
           />
           <p id="webhook-url-help" className="text-xs text-muted-foreground">
             Faultline sends a signed POST request to this URL.
@@ -167,35 +176,47 @@ export function WebhookChannelForm({
           <FieldError id="webhook-url-error" message={errors.url?.message} />
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="webhook-auth">Authentication</Label>
+        <fieldset
+          className="space-y-2"
+          aria-describedby={authChoiceError ? "webhook-auth-error" : undefined}
+        >
+          <legend className="text-sm font-medium">Authentication</legend>
+          {destinationChanged && (
+            <p className="text-xs text-muted-foreground">Choose authentication for the new URL.</p>
+          )}
           <Controller
             control={control}
             name="auth.type"
             render={({ field }) => (
-              <Select
-                value={field.value}
-                disabled={isSubmitting}
-                onValueChange={(type: WebhookFormData["auth"]["type"]) => {
-                  if (type === field.value) return;
-                  resetField("auth.name", { defaultValue: "" });
-                  resetField("auth.value", { defaultValue: "" });
-                  setValue("auth.type", type, { shouldDirty: true });
-                }}
-              >
-                <SelectTrigger id="webhook-auth" ref={field.ref} onBlur={field.onBlur}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {editingChannel && <SelectItem value="keep">Keep saved authentication</SelectItem>}
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="bearer">Bearer token</SelectItem>
-                  <SelectItem value="header">Custom header</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-2">
+                {authOptions
+                  .filter(({ value }) => value !== "keep" || (editingChannel && !destinationChanged))
+                  .map(({ value, label }) => (
+                    <label key={value} className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-body-sm">
+                      <input
+                        type="radio"
+                        className="accent-primary"
+                        name={field.name}
+                        value={value}
+                        checked={field.value === value}
+                        ref={value === "none" ? field.ref : undefined}
+                        onBlur={field.onBlur}
+                        aria-invalid={!!authChoiceError}
+                        onChange={() => {
+                          resetField("auth.name", { defaultValue: "" });
+                          resetField("auth.value", { defaultValue: "" });
+                          field.onChange(value);
+                          clearErrors("auth.type");
+                        }}
+                      />
+                      {label}
+                    </label>
+                  ))}
+              </div>
             )}
           />
-        </div>
+          <FieldError id="webhook-auth-error" message={authChoiceError?.message} />
+        </fieldset>
 
         {authType === "header" && (
           <div className="space-y-1.5">
