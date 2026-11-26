@@ -75,7 +75,7 @@ export default function IncidentsPage({
           <h1 className="text-headline-md font-semibold tracking-tight text-text-primary">Incidents</h1>
           <p className="mt-0.5 text-body-sm text-text-secondary">Track and review incidents for this project.</p>
         </div>
-        <Button size="sm" className="gap-2" asChild>
+        <Button size="sm" className="gap-2 bg-blue-700 font-semibold text-white hover:bg-blue-800 active:bg-blue-800" asChild>
           <Link href={`${incidentsHref}/new`}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Create incident

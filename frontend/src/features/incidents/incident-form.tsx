@@ -145,7 +145,9 @@ export function IncidentForm({
         <footer className="flex flex-wrap items-center justify-end gap-3 rounded-xl border bg-card p-4 shadow-level-1">
           {error && <p role="alert" className="mr-auto text-sm text-error">{error}</p>}
           <Button variant="outline" asChild><Link href={cancelHref}>Cancel</Link></Button>
-          <Button type="submit" disabled={!title.trim()}>{submitLabel}</Button>
+          <Button type="submit" className="bg-blue-700 font-semibold text-white hover:bg-blue-800 active:bg-blue-800 disabled:bg-muted disabled:text-text-secondary disabled:opacity-100" disabled={!title.trim()}>
+            {submitLabel}
+          </Button>
         </footer>
       </fieldset>
     </form>
