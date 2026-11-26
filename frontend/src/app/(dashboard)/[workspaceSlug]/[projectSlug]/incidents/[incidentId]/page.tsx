@@ -1,12 +1,16 @@
 "use client";
 
-import { skipToken, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowUpRight, Bug, Clock3 } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getIncident } from "@/features/incidents/api";
+import { toast } from "@/components/ui/use-toast";
+import { getIncident, incidentsQueryKey, updateIncidentStatus } from "@/features/incidents/api";
+import { getStatusPresentation, type StatusTransition } from "@/features/incidents/status";
+import { StatusActionButton, StatusBadge, StatusChangeModal } from "@/features/incidents/status-controls";
 import { useProjectBySlug } from "@/features/projects/hooks";
 import { ApiError } from "@/lib/api-client";
 
@@ -25,12 +29,41 @@ export default function IncidentDetailPage({
   const projectHref = `/${workspaceSlug}/${projectSlug}`;
   const projectQuery = useProjectBySlug(projectSlug);
   const projectId = projectQuery.project?.id;
+  const detailKey = ["incident-detail", projectId, incidentId] as const;
+  const queryClient = useQueryClient();
+  const [confirmation, setConfirmation] = useState<{ incidentId: string; transition: StatusTransition }>();
   const detail = useQuery({
-    queryKey: ["incident-detail", projectId, incidentId],
+    queryKey: detailKey,
     queryFn: projectId ? ({ signal }) => getIncident(projectId, incidentId, signal) : skipToken,
     retry: (count, error) => count < 2 && !(error instanceof ApiError && error.status < 500),
   });
   const incident = detail.data;
+  const presentation = incident ? getStatusPresentation(incident.status) : undefined;
+  const nextTransition = presentation?.transition;
+  const transition = confirmation && confirmation.incidentId === incident?.id
+    ? confirmation.transition
+    : undefined;
+  const statusUpdate = useMutation({
+    mutationFn: ({ id, transition, note }: { id: string; projectId: string; transition: StatusTransition; note?: string }) =>
+      updateIncidentStatus(id, transition.target, note),
+    retry: false,
+    onSuccess: async (updated, target) => {
+      const key = ["incident-detail", target.projectId, target.id] as const;
+      await queryClient.cancelQueries({ queryKey: key, exact: true });
+      queryClient.setQueryData<Awaited<ReturnType<typeof getIncident>>>(key, (current) =>
+        current ? { ...current, status: updated.status, resolvedAt: updated.resolvedAt } : current,
+      );
+      setConfirmation((current) => current?.incidentId === target.id ? undefined : current);
+      toast({ title: "Incident status updated", variant: "success" });
+      void queryClient.invalidateQueries({ queryKey: key, exact: true });
+      void queryClient.invalidateQueries({ queryKey: incidentsQueryKey(target.projectId), exact: true });
+    },
+  });
+  const statusError = statusUpdate.isError
+    ? statusUpdate.error instanceof ApiError && statusUpdate.error.status === 409
+      ? statusUpdate.error.message
+      : "Couldn’t update the incident status. Try again."
+    : undefined;
   const unavailable = detail.error instanceof ApiError && [403, 404].includes(detail.error.status);
 
   return (
@@ -73,13 +106,20 @@ export default function IncidentDetailPage({
         <>
           <header className="space-y-4">
             <h1 className="break-words text-3xl font-semibold tracking-tight">{incident.title}</h1>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant={incident.severity === "critical" ? "error" : incident.severity === "high" ? "warning" : "neutral"}>
                 {incident.severity} severity
               </Badge>
-              <Badge variant={incident.status === "resolved" ? "success" : "info"}>
-                {incident.status.replaceAll("_", " ")}
-              </Badge>
+              <StatusBadge status={incident.status} variant={presentation?.variant} />
+              {nextTransition && (
+                <StatusActionButton
+                  transition={nextTransition}
+                  onClick={() => {
+                    statusUpdate.reset();
+                    setConfirmation({ incidentId: incident.id, transition: nextTransition });
+                  }}
+                />
+              )}
             </div>
           </header>
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -96,6 +136,12 @@ export default function IncidentDetailPage({
                   <dt className="text-muted-foreground">Started</dt>
                   <dd className="mt-1"><IncidentTime value={incident.startedAt} /></dd>
                 </div>
+                {incident.status === "resolved" && incident.resolvedAt && (
+                  <div>
+                    <dt className="text-muted-foreground">Resolved</dt>
+                    <dd className="mt-1"><IncidentTime value={incident.resolvedAt} /></dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-muted-foreground">Assignee</dt>
                   <dd className="mt-1 break-all">{incident.assigneeId ?? "Unassigned"}</dd>
@@ -147,6 +193,17 @@ export default function IncidentDetailPage({
               </ol>
             ) : <p className="px-5 py-4 text-sm text-muted-foreground">No timeline entries yet.</p>}
           </section>
+          {transition && (
+            <StatusChangeModal
+              transition={transition}
+              pending={statusUpdate.isPending}
+              error={statusError}
+              onCancel={() => setConfirmation(undefined)}
+              onConfirm={(note) => {
+                if (!statusUpdate.isPending) statusUpdate.mutate({ id: incident.id, projectId, transition, note });
+              }}
+            />
+          )}
         </>
       )}
     </div>

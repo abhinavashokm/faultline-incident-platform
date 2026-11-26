@@ -1,3 +1,4 @@
+import type { IncidentStatus } from "@/features/incidents/status";
 import { apiClient } from "@/lib/api-client";
 
 type CreateIncidentPayload = {
@@ -32,6 +33,7 @@ export function createIncident(projectId: string, payload: CreateIncidentPayload
 }
 
 type IncidentDetail = IncidentListItem & {
+  resolvedAt: string | null;
   description: string | null;
   relatedIssues: {
     issueId: string;
@@ -73,5 +75,12 @@ export function updateIncidentDetails(
   return apiClient.patch<CreatedIncident>(
     `/api/v1/projects/${projectId}/incidents/${encodeURIComponent(incidentId)}/details`,
     payload,
+  );
+}
+
+export function updateIncidentStatus(incidentId: string, status: IncidentStatus, note?: string) {
+  return apiClient.post<{ id: string; status: IncidentStatus; resolvedAt: string | null }>(
+    `/api/v1/incidents/${encodeURIComponent(incidentId)}/status`,
+    { status, note },
   );
 }

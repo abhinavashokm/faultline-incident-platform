@@ -93,6 +93,11 @@ class IncidentDetail(IncidentListItem):
     description: str | None
     related_issues: list[RelatedIssue]
     timeline: list[TimelineEntry]
+    resolved_at: datetime | None
+
+    @field_serializer("resolved_at")
+    def serialize_resolved_at(self, value: datetime | None) -> str | None:
+        return utc_isoformat(value) if value is not None else None
 
 
 class IssueSnapshot(BaseModel):

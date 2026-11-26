@@ -136,6 +136,7 @@ class IncidentService:
             assigned_to=incident.assigned_to,
             started_at=incident.started_at,
             description=incident.description,
+            resolved_at=incident.resolved_at,
             related_issues=[RelatedIssue.model_validate(issue) for issue in issues],
             timeline=[TimelineEntry.model_validate(entry) for entry in timeline],
         )

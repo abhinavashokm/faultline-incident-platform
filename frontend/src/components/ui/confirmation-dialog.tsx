@@ -7,13 +7,14 @@ type ConfirmationDialogProps = {
   title: string;
   children: ReactNode;
   confirmLabel: string;
+  confirmVariant?: "primary" | "destructive";
   pending: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 };
 
 export function ConfirmationDialog({
-  title, children, confirmLabel, pending, onCancel, onConfirm,
+  title, children, confirmLabel, confirmVariant = "destructive", pending, onCancel, onConfirm,
 }: ConfirmationDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -43,7 +44,7 @@ export function ConfirmationDialog({
         <Button type="button" variant="outline" autoFocus disabled={pending} onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="button" variant="destructive" disabled={pending} onClick={onConfirm}>
+        <Button type="button" variant={confirmVariant} disabled={pending} onClick={onConfirm}>
           {confirmLabel}
         </Button>
       </div>
