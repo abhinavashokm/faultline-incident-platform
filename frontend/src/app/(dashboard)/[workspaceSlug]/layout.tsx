@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useTransition } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -8,6 +8,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { ProjectFlowHeader } from "@/components/layout/project-flow-header";
 import { useCurrentUser } from "@/features/auth/hooks";
 import { useListProjects } from "@/features/projects/hooks";
+import DashboardLoading from "./loading";
 
 export default function DashboardLayout({
   children,
@@ -19,6 +20,14 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const workspaceSlug = (params.workspaceSlug as string) || "";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [isNavigating, startNavigation] = useTransition();
+  const pendingDestination = isNavigating ? pendingHref : null;
+
+  function navigateFromSidebar(href: string) {
+    setPendingHref(href);
+    startNavigation(() => router.push(href));
+  }
 
   const { data: currentUser } = useCurrentUser();
   const workspaceName = currentUser?.workspace?.name ?? workspaceSlug;
@@ -80,6 +89,8 @@ export default function DashboardLayout({
         workspaceName={workspaceName}
         isMobileOpen={mobileMenuOpen}
         onMobileClose={() => setMobileMenuOpen(false)}
+        pendingDestination={pendingDestination}
+        onNavigate={navigateFromSidebar}
       />
 
       {/* Main Content Area */}
@@ -90,7 +101,10 @@ export default function DashboardLayout({
           onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {children}
+          {pendingDestination && <DashboardLoading />}
+          <div className={pendingDestination ? "hidden" : "contents"}>
+            {children}
+          </div>
         </main>
       </div>
     </div>

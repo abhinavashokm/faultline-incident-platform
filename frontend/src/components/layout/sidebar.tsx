@@ -29,6 +29,8 @@ interface SidebarProps {
   workspaceName: string;
   isMobileOpen: boolean;
   onMobileClose: () => void;
+  pendingDestination: string | null;
+  onNavigate: (href: string) => void;
 }
 
 export function Sidebar({
@@ -36,6 +38,8 @@ export function Sidebar({
   workspaceName,
   isMobileOpen,
   onMobileClose,
+  pendingDestination,
+  onNavigate,
 }: SidebarProps) {
   const pathname = usePathname();
   const params = useParams();
@@ -48,6 +52,25 @@ export function Sidebar({
   const basePrefix = currentProjectSlug
     ? `/${workspaceSlug}/${currentProjectSlug}`
     : `/${workspaceSlug}`;
+
+  function handleLinkClick(event: React.MouseEvent<HTMLAnchorElement>, href: string) {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    onMobileClose();
+    if (href === pathname && !pendingDestination) return;
+
+    event.preventDefault();
+    onNavigate(href);
+  }
 
   const navItems: NavItem[] = [
     {
@@ -115,6 +138,7 @@ export function Sidebar({
         <div className="flex h-14 items-center justify-between px-3.5 border-b border-border">
           <Link
             href={`${basePrefix}/overview`}
+            onClick={(event) => handleLinkClick(event, `${basePrefix}/overview`)}
             className="flex items-center gap-2.5 overflow-hidden"
           >
             {/* Expanded on mobile and desktop, mark only on tablet */}
@@ -141,16 +165,17 @@ export function Sidebar({
         <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive =
-              (Boolean(routeProjectSlug) &&
-                (pathname === item.href || pathname.startsWith(`${item.href}/`))) ||
-              (item.href.endsWith("/overview") && pathname === `/${workspaceSlug}`);
+            const isActive = pendingDestination
+              ? pendingDestination === item.href
+              : (Boolean(routeProjectSlug) &&
+                  (pathname === item.href || pathname.startsWith(`${item.href}/`))) ||
+                (item.href.endsWith("/overview") && pathname === `/${workspaceSlug}`);
 
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                onClick={onMobileClose}
+                onClick={(event) => handleLinkClick(event, item.href)}
                 className={cn(
                   "group flex items-center gap-3 rounded-md px-2.5 py-2 text-body-sm font-medium transition-colors md:justify-center md:px-0 lg:justify-start lg:px-2.5",
                   isActive
