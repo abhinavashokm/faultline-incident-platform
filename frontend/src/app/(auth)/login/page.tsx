@@ -24,6 +24,7 @@ import { useLogin } from "@/features/auth/hooks";
 import { AuthErrorAlert } from "@/features/auth/components/auth-error-alert";
 import { useAuth } from "@/features/auth/auth-context";
 import { listProjectsApi } from "@/features/projects/api";
+import { ApiError } from "@/lib/api-client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,14 +67,30 @@ export default function LoginPage() {
           router.push(`/${slug}/overview`);
         }
       },
-      onError: (err: any) => {
-        if (err.message === "email_not_verified" || err.details?.detail === "email_not_verified" || err.details?.unverified) {
-          router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
-          return;
+      onError: (err) => {
+        if (err instanceof ApiError) {
+          if (
+            err.message === "email_not_verified" ||
+            err.details?.detail === "email_not_verified" ||
+            err.details?.unverified
+          ) {
+            router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+            return;
+          }
+          if (err.status === 401) {
+            setFormError("The email or password is incorrect. Please try again.");
+            return;
+          }
+          if (err.status === 429) {
+            setFormError("Too many sign-in attempts. Please wait a moment and try again.");
+            return;
+          }
+          if (err.status === 422) {
+            setFormError("Please check your email and password and try again.");
+            return;
+          }
         }
-        setFormError(
-          err.message || "Invalid credentials. Please verify your email and password."
-        );
+        setFormError("Sign-in is unavailable right now. Please try again in a moment.");
       },
     });
   }
